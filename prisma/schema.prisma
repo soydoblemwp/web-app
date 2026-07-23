@@ -1,0 +1,1127 @@
+// AI Content Hub — Prisma schema
+// Postgres (Neon) datasource, driver-adapter based client (Prisma 7).
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+
+enum GlobalRole {
+  USER
+  EDITOR
+  ADMIN
+  SUPER_ADMIN
+}
+
+enum WorkspaceRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+enum ProjectRole {
+  OWNER
+  MANAGER
+  EDITOR
+  VIEWER
+}
+
+enum PlanTier {
+  FREE
+  CREATOR
+  PRO
+  BUSINESS
+}
+
+enum ProjectStatus {
+  ACTIVE
+  PAUSED
+  ARCHIVED
+}
+
+enum ContentType {
+  ARTICLE
+  BLOG_POST
+  PRODUCT_DESCRIPTION
+  EMAIL
+  NEWSLETTER
+  VIDEO_SCRIPT
+  AD
+  LANDING_PAGE
+  SERVICE_DESCRIPTION
+  FAQ
+  CALL_TO_ACTION
+  SOCIAL_TEXT
+  TITLE
+  INTRO
+  CONCLUSION
+  SUMMARY
+  OTHER
+}
+
+enum ContentStatus {
+  DRAFT
+  IN_REVIEW
+  APPROVED
+  PUBLISHED
+  ARCHIVED
+}
+
+enum SocialPlatform {
+  INSTAGRAM
+  FACEBOOK
+  TIKTOK
+  YOUTUBE
+  YOUTUBE_SHORTS
+  X
+  LINKEDIN
+  PINTEREST
+}
+
+enum SocialPostStatus {
+  IDEA
+  DRAFT
+  IN_REVIEW
+  APPROVED
+  SCHEDULED
+  PUBLISHED
+  FAILED
+  ARCHIVED
+}
+
+enum CampaignStatus {
+  DRAFT
+  PLANNED
+  ACTIVE
+  PAUSED
+  COMPLETED
+  ARCHIVED
+}
+
+enum CollaborationStatus {
+  LEAD
+  CONTACTED
+  NEGOTIATING
+  AGREED
+  IN_PROGRESS
+  DELIVERED
+  PAID
+  COMPLETED
+  REJECTED
+  CANCELLED
+}
+
+enum MonitorStatus {
+  OK
+  CHANGED
+  ERROR
+  UNKNOWN
+}
+
+enum LinkCheckStatus {
+  OK
+  REDIRECT
+  BROKEN
+  ERROR
+  UNKNOWN
+}
+
+enum AutomationTriggerType {
+  SCHEDULE_DAILY
+  SCHEDULE_WEEKLY
+  SCHEDULE_CRON
+  CONTENT_CREATED
+  POST_CREATED
+  POST_APPROVED
+  CAMPAIGN_STARTED
+  CAMPAIGN_FINISHED
+  MONITOR_CHANGE_DETECTED
+  LINK_BROKEN_DETECTED
+  MANUAL
+}
+
+enum AutomationActionType {
+  CREATE_DRAFT_CONTENT
+  ADD_TO_CALENDAR
+  CHANGE_STATUS
+  CREATE_NOTIFICATION
+  RUN_MONITOR
+  RUN_LINK_CHECK
+  GENERATE_AI_SUMMARY
+  CREATE_TASK
+  SEND_EMAIL
+}
+
+enum AutomationRunStatus {
+  SUCCESS
+  FAILED
+  RUNNING
+  SKIPPED
+}
+
+enum IntegrationType {
+  WORDPRESS
+  GITHUB
+  ANTHROPIC
+  EMAIL
+  STORAGE
+}
+
+enum IntegrationStatus {
+  NOT_CONFIGURED
+  CONNECTED
+  ERROR
+  DISCONNECTED
+}
+
+enum AIResultKind {
+  CHAT_MESSAGE
+  CONTENT_GENERATION
+  REWRITE
+  SUMMARY
+  ADAPTATION
+  ANALYSIS
+  REPLY
+  CAMPAIGN_PLAN
+  SEO_SUGGESTION
+}
+
+enum NotificationType {
+  POST_DUE
+  UPCOMING_DATE
+  AUTOMATION_FAILED
+  MONITOR_CHANGED
+  LINK_BROKEN
+  INTEGRATION_DISCONNECTED
+  USAGE_LIMIT_NEAR
+  COLLABORATION_DUE
+  PAYMENT_PENDING
+  PUBLISH_ERROR
+  GENERIC
+}
+
+enum FileKind {
+  IMAGE
+  VIDEO
+  DOCUMENT
+  LOGO
+  OTHER
+}
+
+enum FileProcessingStatus {
+  PENDING
+  READY
+  FAILED
+}
+
+// ---------------------------------------------------------------------------
+// Auth (Auth.js) + Users
+// ---------------------------------------------------------------------------
+
+model User {
+  id             String     @id @default(cuid())
+  name           String?
+  email          String     @unique
+  emailVerified  DateTime?
+  image          String?
+  passwordHash   String?
+  role           GlobalRole @default(USER)
+  isSuspended    Boolean    @default(false)
+  timezone       String     @default("UTC")
+  locale         String     @default("es")
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  accounts             Account[]
+  sessions             Session[]
+  workspaceMemberships WorkspaceMember[]
+  projectMemberships   ProjectMember[]
+  ownedWorkspaces      Workspace[]        @relation("WorkspaceOwner")
+  contentItems         ContentItem[]      @relation("ContentAuthor")
+  contentVersions      ContentVersion[]   @relation("ContentVersionAuthor")
+  socialPosts          SocialPost[]       @relation("SocialPostAuthor")
+  campaigns            Campaign[]         @relation("CampaignOwner")
+  collaborations       Collaboration[]    @relation("CollaborationOwner")
+  aiConversations      AIConversation[]
+  aiUsageEvents        AIUsage[]
+  notifications        Notification[]
+  auditLogs            AuditLog[]
+  fileAssets           FileAsset[]
+
+  @@index([email])
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ---------------------------------------------------------------------------
+// Workspaces & Projects
+// ---------------------------------------------------------------------------
+
+model Workspace {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  ownerId   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  owner       User              @relation("WorkspaceOwner", fields: [ownerId], references: [id])
+  members     WorkspaceMember[]
+  projects    Project[]
+  subscription Subscription?
+  usageCounters UsageCounter[]
+  featureFlags  FeatureFlag[]
+  auditLogs     AuditLog[]
+
+  @@index([ownerId])
+}
+
+model WorkspaceMember {
+  id          String        @id @default(cuid())
+  workspaceId String
+  userId      String
+  role        WorkspaceRole @default(MEMBER)
+  createdAt   DateTime      @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, userId])
+  @@index([userId])
+}
+
+model Project {
+  id            String        @id @default(cuid())
+  workspaceId   String
+  ownerId       String
+  name          String
+  description   String?
+  logoUrl       String?
+  website       String?
+  industry      String?
+  targetAudience String?
+  primaryLanguage String      @default("es")
+  market        String?
+  timezone      String        @default("UTC")
+  tone          String?
+  goals         String?
+  status        ProjectStatus @default(ACTIVE)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  members             ProjectMember[]
+  brandKit            BrandKit?
+  contentItems        ContentItem[]
+  folders             Folder[]
+  tags                Tag[]
+  campaigns           Campaign[]
+  socialPosts         SocialPost[]
+  socialConnections   SocialPlatformConnection[]
+  collaborations      Collaboration[]
+  monitors            Monitor[]
+  linkChecks          LinkCheck[]
+  automations         Automation[]
+  integrations        Integration[]
+  wordpressConnection WordPressConnection?
+  githubConnection    GitHubConnection?
+  aiConversations     AIConversation[]
+  aiUsageEvents       AIUsage[]
+  aiResults           AIResult[]
+  notifications       Notification[]
+  fileAssets          FileAsset[]
+  seoAnalyses         SeoAnalysis[]
+
+  @@index([workspaceId])
+  @@index([ownerId])
+}
+
+model ProjectMember {
+  id        String      @id @default(cuid())
+  projectId String
+  userId    String
+  role      ProjectRole @default(EDITOR)
+  createdAt DateTime    @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, userId])
+  @@index([userId])
+}
+
+// ---------------------------------------------------------------------------
+// Brand Kit
+// ---------------------------------------------------------------------------
+
+model BrandKit {
+  id                String   @id @default(cuid())
+  projectId         String   @unique
+  name              String?
+  tagline           String?
+  description       String?
+  personality       String?
+  tone              String?
+  valueProposition  String?
+  commonCTAs        String?
+  primaryLinks      String?
+  colors            String[] @default([])
+  logoUrl           String?
+  fontReferences    String?
+  competitors        String?
+  additionalNotes   String?
+  approvedExamples  String?
+  isActiveForAI     Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  project Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  terms   BrandTerm[]
+}
+
+model BrandTerm {
+  id         String   @id @default(cuid())
+  brandKitId String
+  term       String
+  isForbidden Boolean @default(false)
+  createdAt  DateTime @default(now())
+
+  brandKit BrandKit @relation(fields: [brandKitId], references: [id], onDelete: Cascade)
+
+  @@index([brandKitId])
+}
+
+// ---------------------------------------------------------------------------
+// Content Library
+// ---------------------------------------------------------------------------
+
+model Folder {
+  id        String   @id @default(cuid())
+  projectId String
+  name      String
+  parentId  String?
+  createdAt DateTime @default(now())
+
+  project      Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  parent       Folder?       @relation("FolderChildren", fields: [parentId], references: [id])
+  children     Folder[]      @relation("FolderChildren")
+  contentItems ContentItem[]
+
+  @@index([projectId])
+}
+
+model Tag {
+  id        String   @id @default(cuid())
+  projectId String
+  name      String
+  createdAt DateTime @default(now())
+
+  project      Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  contentTags  ContentTag[]
+
+  @@unique([projectId, name])
+}
+
+model ContentItem {
+  id            String        @id @default(cuid())
+  projectId     String
+  authorId      String
+  folderId      String?
+  type          ContentType
+  title         String
+  body          String        @db.Text
+  status        ContentStatus @default(DRAFT)
+  language      String        @default("es")
+  targetAudience String?
+  tone          String?
+  keywords      String[]      @default([])
+  cta           String?
+  isFavorite    Boolean       @default(false)
+  isArchived    Boolean       @default(false)
+  deletedAt     DateTime?
+  sourceContentId String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  project        Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  author         User             @relation("ContentAuthor", fields: [authorId], references: [id])
+  folder         Folder?          @relation(fields: [folderId], references: [id])
+  sourceContent  ContentItem?     @relation("ContentDerivations", fields: [sourceContentId], references: [id])
+  derivedContent ContentItem[]    @relation("ContentDerivations")
+  versions       ContentVersion[]
+  tags           ContentTag[]
+  campaignLinks  CampaignContent[]
+  socialPosts    SocialPost[]     @relation("SocialPostSourceContent")
+
+  @@index([projectId, status])
+  @@index([authorId])
+}
+
+model ContentVersion {
+  id            String   @id @default(cuid())
+  contentItemId String
+  authorId      String
+  title         String
+  body          String   @db.Text
+  note          String?
+  createdAt     DateTime @default(now())
+
+  contentItem ContentItem @relation(fields: [contentItemId], references: [id], onDelete: Cascade)
+  author      User        @relation("ContentVersionAuthor", fields: [authorId], references: [id])
+
+  @@index([contentItemId])
+}
+
+model ContentTag {
+  contentItemId String
+  tagId         String
+
+  contentItem ContentItem @relation(fields: [contentItemId], references: [id], onDelete: Cascade)
+  tag         Tag         @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([contentItemId, tagId])
+}
+
+// ---------------------------------------------------------------------------
+// SEO
+// ---------------------------------------------------------------------------
+
+model SeoAnalysis {
+  id              String   @id @default(cuid())
+  projectId       String
+  title           String?
+  metaDescription String?
+  targetKeyword   String?
+  contentText     String   @db.Text
+  score           Int
+  breakdown       Json
+  createdAt       DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, createdAt])
+}
+
+// ---------------------------------------------------------------------------
+// Campaigns
+// ---------------------------------------------------------------------------
+
+model Campaign {
+  id           String         @id @default(cuid())
+  projectId    String
+  ownerId      String
+  name         String
+  description  String?
+  objective    String?
+  audience     String?
+  productOrService String?
+  startDate    DateTime?
+  endDate      DateTime?
+  platforms    SocialPlatform[] @default([])
+  frequency    String?
+  budget       Decimal?       @db.Decimal(12, 2)
+  primaryCTA   String?
+  links        String[]       @default([])
+  tags         String[]       @default([])
+  status       CampaignStatus @default(DRAFT)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  project  Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  owner    User              @relation("CampaignOwner", fields: [ownerId], references: [id])
+  contents CampaignContent[]
+  posts    SocialPost[]
+
+  @@index([projectId, status])
+}
+
+model CampaignContent {
+  campaignId    String
+  contentItemId String
+
+  campaign    Campaign    @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  contentItem ContentItem @relation(fields: [contentItemId], references: [id], onDelete: Cascade)
+
+  @@id([campaignId, contentItemId])
+}
+
+// ---------------------------------------------------------------------------
+// Social posts
+// ---------------------------------------------------------------------------
+
+model SocialPost {
+  id               String           @id @default(cuid())
+  projectId        String
+  authorId         String
+  campaignId       String?
+  sourceContentId  String?
+  platform         SocialPlatform
+  postType         String
+  internalTitle    String?
+  text             String           @db.Text
+  status           SocialPostStatus @default(IDEA)
+  scheduledAt      DateTime?
+  timezone         String           @default("UTC")
+  tags             String[]         @default([])
+  cta              String?
+  hashtags         String[]         @default([])
+  link             String?
+  notes            String?
+  result           String?
+  publishedAt      DateTime?
+  externalId       String?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  project       Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  author        User                @relation("SocialPostAuthor", fields: [authorId], references: [id])
+  campaign      Campaign?           @relation(fields: [campaignId], references: [id])
+  sourceContent ContentItem?        @relation("SocialPostSourceContent", fields: [sourceContentId], references: [id])
+  versions      SocialPostVersion[]
+  metrics       SocialMetric[]
+  mediaAssets   FileAsset[]
+
+  @@index([projectId, status])
+  @@index([projectId, scheduledAt])
+  @@index([campaignId])
+}
+
+model SocialPostVersion {
+  id           String   @id @default(cuid())
+  socialPostId String
+  text         String   @db.Text
+  note         String?
+  createdAt    DateTime @default(now())
+
+  socialPost SocialPost @relation(fields: [socialPostId], references: [id], onDelete: Cascade)
+
+  @@index([socialPostId])
+}
+
+model SocialPlatformConnection {
+  id              String            @id @default(cuid())
+  projectId       String
+  platform        SocialPlatform
+  status          IntegrationStatus @default(NOT_CONFIGURED)
+  externalAccountId String?
+  displayName     String?
+  encryptedAccessToken  String?      @db.Text
+  encryptedRefreshToken String?      @db.Text
+  tokenExpiresAt  DateTime?
+  lastVerifiedAt  DateTime?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, platform])
+}
+
+model SocialMetric {
+  id           String         @id @default(cuid())
+  socialPostId String
+  source       String
+  views        Int?
+  likes        Int?
+  comments     Int?
+  shares       Int?
+  saves        Int?
+  clicks       Int?
+  newFollowers Int?
+  conversions  Int?
+  revenue      Decimal?       @db.Decimal(12, 2)
+  currency     String?
+  recordedAt   DateTime       @default(now())
+
+  socialPost SocialPost @relation(fields: [socialPostId], references: [id], onDelete: Cascade)
+
+  @@index([socialPostId])
+}
+
+// ---------------------------------------------------------------------------
+// Collaborations (brand deals CRM)
+// ---------------------------------------------------------------------------
+
+model Collaboration {
+  id             String              @id @default(cuid())
+  projectId      String
+  ownerId        String
+  brandName      String
+  status         CollaborationStatus @default(LEAD)
+  productReceived String?
+  collaborationType String?
+  agreedPayment  Decimal?            @db.Decimal(12, 2)
+  paidAmount     Decimal?            @db.Decimal(12, 2)
+  currency       String              @default("EUR")
+  contractUrl    String?
+  notes          String?
+  startDate      DateTime?
+  dueDate        DateTime?
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+
+  project      Project                     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  owner        User                        @relation("CollaborationOwner", fields: [ownerId], references: [id])
+  contacts     CollaborationContact[]
+  deliverables CollaborationDeliverable[]
+  payments     CollaborationPayment[]
+
+  @@index([projectId, status])
+}
+
+model CollaborationContact {
+  id              String   @id @default(cuid())
+  collaborationId String
+  name            String
+  email           String?
+  phone           String?
+  website         String?
+  socialHandles   String?
+  createdAt       DateTime @default(now())
+
+  collaboration Collaboration @relation(fields: [collaborationId], references: [id], onDelete: Cascade)
+
+  @@index([collaborationId])
+}
+
+model CollaborationDeliverable {
+  id              String    @id @default(cuid())
+  collaborationId String
+  description     String
+  dueDate         DateTime?
+  isDelivered     Boolean   @default(false)
+  deliveredAt     DateTime?
+  publishedLink   String?
+  createdAt       DateTime  @default(now())
+
+  collaboration Collaboration @relation(fields: [collaborationId], references: [id], onDelete: Cascade)
+
+  @@index([collaborationId])
+}
+
+model CollaborationPayment {
+  id              String    @id @default(cuid())
+  collaborationId String
+  amount          Decimal   @db.Decimal(12, 2)
+  currency        String    @default("EUR")
+  isReceived      Boolean   @default(false)
+  receivedAt      DateTime?
+  note            String?
+  createdAt       DateTime  @default(now())
+
+  collaboration Collaboration @relation(fields: [collaborationId], references: [id], onDelete: Cascade)
+
+  @@index([collaborationId])
+}
+
+// ---------------------------------------------------------------------------
+// Monitoring & link checking
+// ---------------------------------------------------------------------------
+
+model Monitor {
+  id                String        @id @default(cuid())
+  projectId         String
+  name              String
+  url               String
+  checkFrequencyMinutes Int       @default(1440)
+  priceSelector     String?
+  availabilitySelector String?
+  lastStatus        MonitorStatus @default(UNKNOWN)
+  lastCheckedAt     DateTime?
+  isActive          Boolean       @default(true)
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  project Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  runs    MonitorRun[]
+  changes MonitorChange[]
+
+  @@index([projectId])
+}
+
+model MonitorRun {
+  id           String        @id @default(cuid())
+  monitorId    String
+  status       MonitorStatus
+  httpStatus   Int?
+  durationMs   Int?
+  errorMessage String?
+  title        String?
+  description  String?
+  createdAt    DateTime      @default(now())
+
+  monitor Monitor @relation(fields: [monitorId], references: [id], onDelete: Cascade)
+
+  @@index([monitorId, createdAt])
+}
+
+model MonitorChange {
+  id          String   @id @default(cuid())
+  monitorId   String
+  field       String
+  oldValue    String?  @db.Text
+  newValue    String?  @db.Text
+  detectedAt  DateTime @default(now())
+
+  monitor Monitor @relation(fields: [monitorId], references: [id], onDelete: Cascade)
+
+  @@index([monitorId, detectedAt])
+}
+
+model LinkCheck {
+  id             String          @id @default(cuid())
+  projectId      String
+  url            String
+  status         LinkCheckStatus @default(UNKNOWN)
+  httpStatus     Int?
+  finalUrl       String?
+  durationMs     Int?
+  attemptCount   Int             @default(0)
+  isIgnored      Boolean         @default(false)
+  errorMessage   String?
+  lastCheckedAt  DateTime?
+  createdAt      DateTime        @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, status])
+}
+
+// ---------------------------------------------------------------------------
+// Automations
+// ---------------------------------------------------------------------------
+
+model Automation {
+  id          String                @id @default(cuid())
+  projectId   String
+  name        String
+  description String?
+  triggerType AutomationTriggerType
+  triggerConfig Json?
+  conditions  Json?
+  isActive    Boolean               @default(true)
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
+
+  project Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  actions AutomationAction[]
+  runs    AutomationRun[]
+
+  @@index([projectId])
+}
+
+model AutomationAction {
+  id           String               @id @default(cuid())
+  automationId String
+  order        Int                  @default(0)
+  actionType   AutomationActionType
+  config       Json?
+
+  automation Automation @relation(fields: [automationId], references: [id], onDelete: Cascade)
+
+  @@index([automationId])
+}
+
+model AutomationRun {
+  id           String              @id @default(cuid())
+  automationId String
+  status       AutomationRunStatus
+  message      String?
+  idempotencyKey String?
+  startedAt    DateTime            @default(now())
+  finishedAt   DateTime?
+
+  automation Automation @relation(fields: [automationId], references: [id], onDelete: Cascade)
+
+  @@unique([automationId, idempotencyKey])
+  @@index([automationId, startedAt])
+}
+
+// ---------------------------------------------------------------------------
+// Integrations
+// ---------------------------------------------------------------------------
+
+model Integration {
+  id          String            @id @default(cuid())
+  projectId   String
+  type        IntegrationType
+  status      IntegrationStatus @default(NOT_CONFIGURED)
+  lastCheckedAt DateTime?
+  lastError   String?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, type])
+}
+
+model WordPressConnection {
+  id                 String            @id @default(cuid())
+  projectId          String            @unique
+  siteUrl            String
+  username           String
+  encryptedAppPassword String          @db.Text
+  status             IntegrationStatus @default(NOT_CONFIGURED)
+  lastVerifiedAt     DateTime?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+model GitHubConnection {
+  id               String            @id @default(cuid())
+  projectId        String            @unique
+  accountLogin     String
+  encryptedAccessToken String        @db.Text
+  status           IntegrationStatus @default(NOT_CONFIGURED)
+  scopes           String[]          @default([])
+  lastVerifiedAt   DateTime?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+// ---------------------------------------------------------------------------
+// AI
+// ---------------------------------------------------------------------------
+
+model AIConversation {
+  id        String   @id @default(cuid())
+  projectId String
+  userId    String
+  title     String   @default("Nueva conversación")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  project  Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user     User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages AIMessage[]
+
+  @@index([projectId, userId])
+}
+
+model AIMessage {
+  id             String   @id @default(cuid())
+  conversationId String
+  role           String
+  content        String   @db.Text
+  createdAt      DateTime @default(now())
+
+  conversation AIConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId])
+}
+
+model AIUsage {
+  id          String       @id @default(cuid())
+  projectId   String
+  userId      String
+  kind        AIResultKind
+  provider    String
+  model       String
+  inputTokens Int          @default(0)
+  outputTokens Int         @default(0)
+  latencyMs   Int?
+  wasCached   Boolean      @default(false)
+  wasError    Boolean      @default(false)
+  errorMessage String?
+  createdAt   DateTime     @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, createdAt])
+  @@index([userId, createdAt])
+}
+
+model AIResult {
+  id          String       @id @default(cuid())
+  projectId   String
+  kind        AIResultKind
+  inputHash   String
+  prompt      String       @db.Text
+  output      String       @db.Text
+  createdAt   DateTime     @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, kind, inputHash])
+  @@index([projectId, kind])
+}
+
+// ---------------------------------------------------------------------------
+// Notifications & audit
+// ---------------------------------------------------------------------------
+
+model Notification {
+  id         String           @id @default(cuid())
+  projectId  String?
+  userId     String
+  type       NotificationType
+  title      String
+  message    String
+  resourceUrl String?
+  isRead     Boolean          @default(false)
+  createdAt  DateTime         @default(now())
+
+  project Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead])
+}
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  workspaceId String?
+  actorId     String?
+  action      String
+  targetType  String?
+  targetId    String?
+  metadata    Json?
+  createdAt   DateTime @default(now())
+
+  workspace Workspace? @relation(fields: [workspaceId], references: [id])
+  actor     User?      @relation(fields: [actorId], references: [id])
+
+  @@index([workspaceId, createdAt])
+  @@index([actorId, createdAt])
+}
+
+// ---------------------------------------------------------------------------
+// Plans, subscriptions & usage limits
+// ---------------------------------------------------------------------------
+
+model Plan {
+  id                     String   @id @default(cuid())
+  tier                   PlanTier @unique
+  name                   String
+  maxProjects            Int
+  maxMembers             Int
+  maxAIGenerationsPerMonth Int
+  maxAITokensPerMonth    Int
+  maxAutomations         Int
+  maxMonitors            Int
+  minMonitorFrequencyMinutes Int
+  maxIntegrations        Int
+  maxStorageMb           Int
+  maxCampaigns           Int
+  priceMonthlyCents      Int      @default(0)
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  subscriptions Subscription[]
+}
+
+model Subscription {
+  id          String    @id @default(cuid())
+  workspaceId String    @unique
+  planId      String
+  isActive    Boolean   @default(true)
+  currentPeriodStart DateTime @default(now())
+  currentPeriodEnd   DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  plan      Plan      @relation(fields: [planId], references: [id])
+}
+
+model UsageCounter {
+  id          String   @id @default(cuid())
+  workspaceId String
+  metric      String
+  periodStart DateTime
+  periodEnd   DateTime
+  count       Int      @default(0)
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, metric, periodStart])
+}
+
+model FeatureFlag {
+  id          String   @id @default(cuid())
+  workspaceId String?
+  key         String
+  isEnabled   Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workspace Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, key])
+}
+
+// ---------------------------------------------------------------------------
+// Files
+// ---------------------------------------------------------------------------
+
+model FileAsset {
+  id              String               @id @default(cuid())
+  projectId       String
+  ownerId         String
+  kind            FileKind
+  originalName    String
+  storageKey      String
+  url             String
+  mimeType        String
+  sizeBytes       Int
+  processingStatus FileProcessingStatus @default(READY)
+  socialPostId    String?
+  createdAt       DateTime             @default(now())
+
+  project    Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  owner      User        @relation(fields: [ownerId], references: [id])
+  socialPost SocialPost? @relation(fields: [socialPostId], references: [id])
+
+  @@index([projectId])
+}
