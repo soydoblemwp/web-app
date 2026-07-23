@@ -1,13 +1,14 @@
 import "server-only";
-import { aiConfig, isAIEnabled } from "@/lib/config";
+import { aiConfig } from "@/lib/config";
+import { getAnthropicApiKey, isAnthropicConfigured } from "@/lib/env/server";
 import { checkGuestAIRateLimit, GuestRateLimitConfigError } from "@/lib/security/guest-rate-limit";
 import { AnthropicProvider } from "@/lib/ai/providers/anthropic";
 import type { AIConversationTurn, AIProvider } from "@/lib/ai/types";
 import { AIProviderError } from "@/lib/ai/types";
 
 function getProvider(): AIProvider | null {
-  if (!isAIEnabled()) return null;
-  if (aiConfig.provider === "anthropic") return new AnthropicProvider();
+  if (!isAnthropicConfigured()) return null;
+  if (aiConfig.provider === "anthropic") return new AnthropicProvider(getAnthropicApiKey());
   return null;
 }
 

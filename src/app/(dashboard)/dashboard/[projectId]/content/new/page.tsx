@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { GenerateContentForm } from "@/components/content/generate-content-form";
-import { isAIEnabled } from "@/lib/ai/service";
 
 export const metadata: Metadata = { title: "Generar contenido" };
 
@@ -15,7 +14,7 @@ export default async function NewContentPage({ params }: { params: Promise<{ pro
           Describe lo que necesitas y la IA generará un primer borrador que podrás editar y guardar en la biblioteca.
         </p>
       </div>
-      <GenerateContentForm projectId={projectId} aiEnabled={isAIEnabled()} />
+      <GenerateContentForm projectId={projectId} />
     </div>
   );
 }

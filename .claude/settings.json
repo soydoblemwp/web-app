@@ -59,7 +59,18 @@
       "Bash(AUTH_SECRET=\"build-placeholder-secret-value-0123456789\" ENCRYPTION_KEY=\"build-placeholder-key\" GUEST_RATE_LIMIT_SECRET=\"build-placeholder-guest-secret\" npx next build)",
       "Bash(npx tsx *)",
       "Bash(echo \"TSC EXIT:$?\")",
-      "Bash(xargs grep -l \"\\\\\"use client\\\\\"\")"
+      "Bash(xargs grep -l \"\\\\\"use client\\\\\"\")",
+      "Bash(DATABASE_URL=\"postgresql://user:password@localhost:5432/db\" AUTH_SECRET=\"build-placeholder-secret-value-0123456789\" ENCRYPTION_KEY=\"build-placeholder-key\" GUEST_RATE_LIMIT_SECRET=\"build-placeholder-guest-secret\" ANTHROPIC_API_KEY=\"sk-ant-test-placeholder-value-not-real\" npx next start -p 3312)",
+      "Bash(echo \"started pid $!\")",
+      "Bash(curl -s http://localhost:3312/api/health/ai)",
+      "Bash(curl -s -o /dev/null -w \"status: %{http_code}\\\\n\" http://localhost:3312/api/health/ai)",
+      "Bash(curl -s -o /dev/null -w \"status: %{http_code}\\\\n\" http://localhost:3312/guest/content)",
+      "Bash(curl -s http://localhost:3312/guest/content)",
+      "Bash(pkill -f \"next start -p 3312\")",
+      "Bash(DATABASE_URL=\"postgresql://user:password@localhost:5432/db\" AUTH_SECRET=\"build-placeholder-secret-value-0123456789\" ENCRYPTION_KEY=\"build-placeholder-key\" GUEST_RATE_LIMIT_SECRET=\"build-placeholder-guest-secret\" ANTHROPIC_API_KEY=\"\" npx next start -p 3313)",
+      "Bash(curl -s http://localhost:3313/api/health/ai)",
+      "Bash(curl -s -o /dev/null -w \"status: %{http_code}\\\\n\" http://localhost:3313/api/health/ai)",
+      "Bash(pkill -f \"next start -p 3313\")"
     ],
     "additionalDirectories": [
       "C:\\Users\\joele\\OneDrive\\Escritorio\\WEB APP\\src\\app\\api\\auth",

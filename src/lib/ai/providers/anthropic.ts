@@ -7,9 +7,10 @@ export class AnthropicProvider implements AIProvider {
   readonly name = "anthropic";
   private client: Anthropic;
 
-  constructor() {
+  /** Takes the key explicitly — never reads process.env itself. Callers get it from src/lib/env/server.ts. */
+  constructor(apiKey: string) {
     this.client = new Anthropic({
-      apiKey: process.env.ANTHROPIC_API_KEY,
+      apiKey,
       timeout: aiConfig.requestTimeoutMs,
     });
   }

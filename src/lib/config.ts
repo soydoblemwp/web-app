@@ -13,6 +13,9 @@ export const appConfig = {
   defaultTimezone: "UTC",
 } as const;
 
+// Non-secret AI configuration only. Whether the Anthropic API key is
+// configured lives in src/lib/env/server.ts (isAnthropicConfigured) — that
+// module is the only place allowed to read or check ANTHROPIC_API_KEY.
 export const aiConfig = {
   provider: process.env.AI_PROVIDER ?? "anthropic",
   model: process.env.AI_MODEL ?? "claude-sonnet-4-5",
@@ -20,15 +23,3 @@ export const aiConfig = {
   requestTimeoutMs: Number(process.env.AI_REQUEST_TIMEOUT ?? 30_000),
   maxInputCharacters: 20_000,
 } as const;
-
-/**
- * Whether the Anthropic API key is configured. Deliberately a function, not
- * a value computed once at module load — Next.js can keep a module instance
- * warm across requests (and across a whole build in the case of static
- * generation), so a constant here can go stale relative to the actual
- * environment for the request currently being served. Call this at the
- * point of use instead of caching the result.
- */
-export function isAIEnabled(): boolean {
-  return Boolean(process.env.ANTHROPIC_API_KEY?.trim());
-}

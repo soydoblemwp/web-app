@@ -38,7 +38,7 @@ const TYPE_LABELS: Record<string, string> = {
   OTHER: "Otro",
 };
 
-export function GenerateContentForm({ projectId, aiEnabled }: { projectId: string; aiEnabled: boolean }) {
+export function GenerateContentForm({ projectId }: { projectId: string }) {
   const [state, formAction, isPending] = useActionState(generateContentAction, initialState);
 
   return (
@@ -101,13 +101,6 @@ export function GenerateContentForm({ projectId, aiEnabled }: { projectId: strin
           Aplicar el kit de marca de este proyecto
         </Label>
       </div>
-
-      {!aiEnabled ? (
-        <p className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
-          El asistente de IA no está configurado (falta ANTHROPIC_API_KEY). Puedes rellenar este formulario, pero la
-          generación fallará hasta que se configure una clave de API.
-        </p>
-      ) : null}
 
       {state.error ? <p className="text-sm text-destructive">{state.error}</p> : null}
 

@@ -6,7 +6,6 @@ import { listConversations } from "@/server/services/assistant";
 import { createConversationAction } from "@/server/actions/assistant";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { isAIEnabled } from "@/lib/ai/service";
 
 export const metadata: Metadata = { title: "Asistente IA" };
 
@@ -29,15 +28,6 @@ export default async function AssistantPage({ params }: { params: Promise<{ proj
           </Button>
         </form>
       </div>
-
-      {!isAIEnabled() ? (
-        <Card className="border-amber-300 bg-amber-50">
-          <CardContent className="py-4 text-sm text-amber-800">
-            El asistente de IA no está configurado (falta ANTHROPIC_API_KEY). Puedes crear conversaciones, pero no
-            recibirás respuesta hasta que se configure una clave de API.
-          </CardContent>
-        </Card>
-      ) : null}
 
       {conversations.length === 0 ? (
         <Card className="border-dashed">

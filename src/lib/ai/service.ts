@@ -1,6 +1,7 @@
 import "server-only";
 import { createHash } from "node:crypto";
-import { aiConfig, isAIEnabled as isAnthropicKeyConfigured } from "@/lib/config";
+import { aiConfig } from "@/lib/config";
+import { getAnthropicApiKey, isAnthropicConfigured } from "@/lib/env/server";
 import { prisma } from "@/lib/db/prisma";
 import { checkRateLimit } from "@/lib/security/rate-limit";
 import { AnthropicProvider } from "@/lib/ai/providers/anthropic";
@@ -13,8 +14,8 @@ const RATE_LIMIT_PER_MINUTE = 10;
 const RATE_LIMIT_WINDOW_MS = 60_000;
 
 function getProvider(): AIProvider | null {
-  if (!isAnthropicKeyConfigured()) return null;
-  if (aiConfig.provider === "anthropic") return new AnthropicProvider();
+  if (!isAnthropicConfigured()) return null;
+  if (aiConfig.provider === "anthropic") return new AnthropicProvider(getAnthropicApiKey());
   return null;
 }
 
@@ -164,8 +165,4 @@ export async function generateAIContent(
     });
     throw error;
   }
-}
-
-export function isAIEnabled(): boolean {
-  return isAnthropicKeyConfigured();
 }
