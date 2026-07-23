@@ -19,5 +19,16 @@ export const aiConfig = {
   maxOutputTokens: Number(process.env.AI_MAX_TOKENS ?? 2048),
   requestTimeoutMs: Number(process.env.AI_REQUEST_TIMEOUT ?? 30_000),
   maxInputCharacters: 20_000,
-  enabled: Boolean(process.env.ANTHROPIC_API_KEY),
 } as const;
+
+/**
+ * Whether the Anthropic API key is configured. Deliberately a function, not
+ * a value computed once at module load — Next.js can keep a module instance
+ * warm across requests (and across a whole build in the case of static
+ * generation), so a constant here can go stale relative to the actual
+ * environment for the request currently being served. Call this at the
+ * point of use instead of caching the result.
+ */
+export function isAIEnabled(): boolean {
+  return Boolean(process.env.ANTHROPIC_API_KEY?.trim());
+}
