@@ -9,6 +9,11 @@ const { auth } = NextAuth(authEdgeConfig);
 
 const ADMIN_ROLES = new Set(["ADMIN", "SUPER_ADMIN"]);
 
+// Three-way route protection: authenticated users pass the checks below;
+// admins additionally need an admin role on /admin/:path*; guests (no
+// session) are redirected away from /dashboard and /admin but are never
+// touched here on /guest/:path* — that tree is intentionally outside the
+// matcher below so it stays public without needing a bypass rule.
 export default auth((req) => {
   const { pathname } = req.nextUrl;
   const isLoggedIn = Boolean(req.auth?.user);

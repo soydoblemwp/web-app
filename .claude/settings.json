@@ -39,7 +39,20 @@
       "Bash(npx eslint *)",
       "Bash(DATABASE_URL=\"postgresql://user:password@localhost:5432/db\" AUTH_SECRET=\"build-placeholder-secret-value-0123456789\" ENCRYPTION_KEY=\"build-placeholder-key\" npx next build)",
       "Bash(npx vitest *)",
-      "Bash(npm uninstall *)"
+      "Bash(npm uninstall *)",
+      "Bash(DATABASE_URL=\"postgresql://user:password@localhost:5432/db\" AUTH_SECRET=\"build-placeholder-secret-value-0123456789\" ENCRYPTION_KEY=\"build-placeholder-key\" npx next start -p 3311)",
+      "Bash(echo \"started, pid $!\")",
+      "Bash(curl -s -o /dev/null -w \"GET / -> %{http_code}\\\\n\" http://localhost:3311/)",
+      "Bash(curl -s http://localhost:3311/)",
+      "Bash(curl -s -o /dev/null -w \"GET /guest -> %{http_code}\\\\n\" http://localhost:3311/guest)",
+      "Bash(curl -s http://localhost:3311/guest)",
+      "Bash(curl -s -o /dev/null -w \"GET /login -> %{http_code}\\\\n\" http://localhost:3311/login)",
+      "Bash(curl -s http://localhost:3311/login)",
+      "Bash(curl -s -o /dev/null -w \"GET /register -> %{http_code}\\\\n\" http://localhost:3311/register)",
+      "Bash(curl -s http://localhost:3311/register)",
+      "Bash(curl -s -o /dev/null -w \"GET /dashboard \\(no session\\) -> %{http_code}\\\\n\" http://localhost:3311/dashboard)",
+      "Bash(curl -s -D - -o /dev/null http://localhost:3311/dashboard)",
+      "Bash(pkill -f \"next start -p 3311\")"
     ],
     "additionalDirectories": [
       "C:\\Users\\joele\\OneDrive\\Escritorio\\WEB APP\\src\\app\\api\\auth",

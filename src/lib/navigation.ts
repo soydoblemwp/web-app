@@ -21,6 +21,11 @@ import {
   FolderKanban,
   Settings,
   ShieldCheck,
+  ClipboardCheck,
+  Sparkles,
+  Repeat,
+  Bell,
+  Download,
 } from "lucide-react";
 
 export interface NavItem {
@@ -91,3 +96,50 @@ export const workspaceNavItems: NavItem[] = [
 ];
 
 export const adminNavItems: NavItem[] = [{ label: "Panel administrativo", segment: "/admin", icon: ShieldCheck }];
+
+export interface GuestNavItem {
+  label: string;
+  icon: LucideIcon;
+  /** Present only for tools actually usable without an account. */
+  href?: string;
+  /** True for modules that need an account — rendered via AccountGateNavItem instead of a link. */
+  restricted?: boolean;
+}
+
+export interface GuestNavGroup {
+  label: string;
+  items: GuestNavItem[];
+}
+
+export const guestNavGroups: GuestNavGroup[] = [
+  {
+    label: "Disponibles sin cuenta",
+    items: [
+      { label: "Generador de contenido", href: "/guest/content", icon: FileText },
+      { label: "Herramientas SEO", href: "/guest/seo", icon: Search },
+      { label: "Analizador de publicaciones", href: "/guest/analyzer", icon: ClipboardCheck },
+      { label: "Ideas para redes sociales", href: "/guest/ideas", icon: Sparkles },
+      { label: "Adaptador de contenido", href: "/guest/adapter", icon: Repeat },
+      { label: "Generador de respuestas", href: "/guest/replies", icon: MessageSquareReply },
+    ],
+  },
+  {
+    label: "Requieren una cuenta",
+    items: [
+      { label: "Proyectos permanentes", icon: FolderKanban, restricted: true },
+      { label: "Historial sincronizado", icon: LineChart, restricted: true },
+      { label: "Biblioteca permanente", icon: Library, restricted: true },
+      { label: "Campañas guardadas", icon: Megaphone, restricted: true },
+      { label: "Calendario permanente", icon: CalendarDays, restricted: true },
+      { label: "Automatizaciones", icon: Workflow, restricted: true },
+      { label: "Monitoreo", icon: Radar, restricted: true },
+      { label: "Integración WordPress", icon: Globe, restricted: true },
+      { label: "Integración GitHub", icon: GitBranch, restricted: true },
+      { label: "Colaboraciones", icon: Handshake, restricted: true },
+      { label: "Notificaciones persistentes", icon: Bell, restricted: true },
+      { label: "Configuración de marca", icon: Palette, restricted: true },
+      { label: "Administración", icon: ShieldCheck, restricted: true },
+      { label: "Exportar o eliminar datos", icon: Download, restricted: true },
+    ],
+  },
+];

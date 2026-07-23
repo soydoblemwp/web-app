@@ -53,7 +53,8 @@ export default function LandingPage() {
       <header className="border-b">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
           <span className="text-lg font-semibold tracking-tight">{appConfig.name}</span>
-          <nav className="flex items-center gap-2">
+          <nav className="flex flex-wrap items-center justify-end gap-2">
+            <Button variant="ghost" render={<Link href="/guest">Continuar sin cuenta</Link>} />
             <Button variant="ghost" render={<Link href="/login">Iniciar sesión</Link>} />
             <Button render={<Link href="/register">Crear cuenta</Link>} />
           </nav>
@@ -69,10 +70,15 @@ export default function LandingPage() {
             {appConfig.description} Un único producto modular: mismo sistema de usuarios, mismos proyectos, mismo
             historial.
           </p>
-          <div className="mt-8 flex justify-center gap-3">
+          <div className="mt-8 flex flex-wrap justify-center gap-3">
             <Button size="lg" render={<Link href="/register">Empezar gratis</Link>} />
             <Button size="lg" variant="outline" render={<Link href="/login">Ya tengo cuenta</Link>} />
+            <Button size="lg" variant="outline" render={<Link href="/guest">Continuar sin cuenta</Link>} />
           </div>
+          <p className="mt-3 text-xs text-muted-foreground">
+            Sin registro puedes probar las herramientas básicas al momento. Tu contenido se guarda solo en este
+            navegador, no en tu cuenta.
+          </p>
         </section>
 
         <section className="mx-auto max-w-6xl px-6 py-12">

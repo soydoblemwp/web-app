@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { appConfig } from "@/lib/config";
 
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
@@ -9,6 +10,11 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
           <p className="mt-1 text-sm text-muted-foreground">{appConfig.description}</p>
         </div>
         <div className="rounded-xl border bg-card p-6 shadow-sm">{children}</div>
+        <p className="text-center text-sm">
+          <Link href="/guest" className="text-muted-foreground underline-offset-4 hover:underline">
+            Continuar sin cuenta →
+          </Link>
+        </p>
       </div>
     </div>
   );
