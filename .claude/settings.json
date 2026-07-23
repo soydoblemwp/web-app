@@ -52,7 +52,13 @@
       "Bash(curl -s http://localhost:3311/register)",
       "Bash(curl -s -o /dev/null -w \"GET /dashboard \\(no session\\) -> %{http_code}\\\\n\" http://localhost:3311/dashboard)",
       "Bash(curl -s -D - -o /dev/null http://localhost:3311/dashboard)",
-      "Bash(pkill -f \"next start -p 3311\")"
+      "Bash(pkill -f \"next start -p 3311\")",
+      "Bash(echo \"exit:$?\")",
+      "Bash(echo \"TYPECHECK EXIT:$?\")",
+      "Bash(echo \"LINT EXIT:$?\")",
+      "Bash(AUTH_SECRET=\"build-placeholder-secret-value-0123456789\" ENCRYPTION_KEY=\"build-placeholder-key\" GUEST_RATE_LIMIT_SECRET=\"build-placeholder-guest-secret\" npx next build)",
+      "Bash(npx tsx *)",
+      "Bash(echo \"TSC EXIT:$?\")"
     ],
     "additionalDirectories": [
       "C:\\Users\\joele\\OneDrive\\Escritorio\\WEB APP\\src\\app\\api\\auth",

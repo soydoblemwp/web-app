@@ -76,8 +76,8 @@ export default function LandingPage() {
             <Button size="lg" variant="outline" render={<Link href="/guest">Continuar sin cuenta</Link>} />
           </div>
           <p className="mt-3 text-xs text-muted-foreground">
-            Sin registro puedes probar las herramientas básicas al momento. Tu contenido se guarda solo en este
-            navegador, no en tu cuenta.
+            Sin registro puedes probar las herramientas básicas al momento. Tu contenido se conserva solo durante
+            esta sesión del navegador, no en tu cuenta ni de forma permanente.
           </p>
         </section>
 

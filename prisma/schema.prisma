@@ -1125,3 +1125,24 @@ model FileAsset {
 
   @@index([projectId])
 }
+
+// ---------------------------------------------------------------------------
+// Guest mode
+// ---------------------------------------------------------------------------
+
+/// Persistent, atomic rate-limit counter for unauthenticated guest AI usage.
+/// Stores an irreversible HMAC-SHA256 hash of the request IP (never the IP
+/// itself) plus a fixed time window and a request count — no prompts, no
+/// responses, no drafts. Backed by Neon so the limit holds across separate
+/// Vercel function instances/restarts, unlike an in-process counter.
+model GuestRateLimit {
+  id           String   @id @default(cuid())
+  ipHash       String
+  periodStart  DateTime
+  requestCount Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([ipHash, periodStart])
+  @@index([periodStart])
+}

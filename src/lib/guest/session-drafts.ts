@@ -1,8 +1,9 @@
 /**
  * Guest-mode draft persistence. Runs entirely in the browser — nothing here
- * ever reaches Neon or any server. This is intentionally the only place
- * guest-generated content is kept, and only for as long as the browser
- * keeps localStorage for this origin (cleared cache/storage removes it).
+ * ever reaches Neon or any server. Uses sessionStorage rather than
+ * localStorage on purpose: drafts must survive page reloads and navigation
+ * within the current browser tab/session, but must NOT persist once that
+ * session ends — closing the tab or the browser clears them for good.
  */
 
 export type GuestTool = "content" | "ideas" | "adapter" | "replies";
@@ -25,7 +26,7 @@ function isBrowser(): boolean {
 export function loadGuestDrafts(tool?: GuestTool): GuestDraft[] {
   if (!isBrowser()) return [];
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
+    const raw = window.sessionStorage.getItem(STORAGE_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw) as GuestDraft[];
     if (!Array.isArray(parsed)) return [];
@@ -47,7 +48,7 @@ export function saveGuestDraft(draft: { tool: GuestTool; title: string; content:
   };
   const next = [entry, ...all].slice(0, MAX_DRAFTS);
   try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+    window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify(next));
   } catch {
     // Storage full or unavailable (private browsing) — the draft still
     // displays in the current page; it just won't survive a reload.
@@ -60,7 +61,7 @@ export function deleteGuestDraft(id: string): GuestDraft[] {
   const all = loadGuestDrafts();
   const next = all.filter((d) => d.id !== id);
   try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+    window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify(next));
   } catch {
     // ignore
   }

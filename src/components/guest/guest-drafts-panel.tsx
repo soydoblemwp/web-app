@@ -10,17 +10,19 @@ import {
   deleteGuestDraft,
   loadGuestDrafts,
   saveGuestDraft,
-} from "@/lib/guest/local-drafts";
+} from "@/lib/guest/session-drafts";
 
 /**
- * Shared "results saved in this browser" list for every guest AI tool.
- * Reads/writes localStorage only — see src/lib/guest/local-drafts.ts.
+ * Shared "results saved in this browser tab for this session" list for
+ * every guest AI tool. Reads/writes sessionStorage only — see
+ * src/lib/guest/session-drafts.ts. Cleared automatically when the tab or
+ * browser closes.
  */
 export function useGuestDrafts(tool: GuestTool) {
   const [drafts, setDrafts] = useState<GuestDraft[]>([]);
 
   useEffect(() => {
-    // localStorage doesn't exist during SSR, so the initial (empty) render
+    // sessionStorage doesn't exist during SSR, so the initial (empty) render
     // must be reconciled with the real drafts after mount, on the client
     // only — this is the one legitimate case for setting state directly in
     // an effect rather than deriving it from props/state.
@@ -51,7 +53,7 @@ export function GuestDraftsPanel({
   return (
     <div className="space-y-3">
       <h2 className="text-sm font-medium text-muted-foreground">
-        Guardado en este navegador ({drafts.length})
+        Guardado en esta sesión del navegador ({drafts.length}) — se perderá al cerrar la pestaña
       </h2>
       <div className="space-y-3">
         {drafts.map((draft) => (

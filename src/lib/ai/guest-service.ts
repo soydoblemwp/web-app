@@ -1,12 +1,9 @@
 import "server-only";
 import { aiConfig } from "@/lib/config";
-import { checkRateLimit } from "@/lib/security/rate-limit";
+import { checkGuestAIRateLimit, GuestRateLimitConfigError } from "@/lib/security/guest-rate-limit";
 import { AnthropicProvider } from "@/lib/ai/providers/anthropic";
 import type { AIConversationTurn, AIProvider } from "@/lib/ai/types";
 import { AIProviderError } from "@/lib/ai/types";
-
-const GUEST_RATE_LIMIT_PER_MINUTE = 6;
-const GUEST_RATE_LIMIT_WINDOW_MS = 60_000;
 
 function getProvider(): AIProvider | null {
   if (!aiConfig.enabled) return null;
@@ -15,7 +12,7 @@ function getProvider(): AIProvider | null {
 }
 
 export interface GenerateGuestAIContentInput {
-  /** Rate-limit key only (e.g. request IP) — never persisted anywhere. */
+  /** Rate-limit key only (e.g. request IP) — hashed before storage, never persisted in the clear. */
   clientKey: string;
   system?: string;
   history?: AIConversationTurn[];
@@ -25,10 +22,10 @@ export interface GenerateGuestAIContentInput {
 
 /**
  * Guest-mode entry point to the AI provider. Unlike `generateAIContent`
- * (src/lib/ai/service.ts), this never touches Prisma — no usage row, no
- * result cache, no project/user association — because guest sessions have
- * neither a project nor an account to attach that data to. Rate limiting is
- * keyed by request IP instead of user id.
+ * (src/lib/ai/service.ts), this never stores prompts, responses, usage
+ * rows, or a result cache — because guest sessions have neither a project
+ * nor an account to attach that data to. The only Prisma write here is the
+ * atomic, IP-hash-only rate-limit counter in guest-rate-limit.ts.
  */
 export async function generateGuestAIContent(
   input: GenerateGuestAIContentInput
@@ -48,14 +45,20 @@ export async function generateGuestAIContent(
     );
   }
 
-  const rateLimit = checkRateLimit(
-    `guest-ai:${input.clientKey}`,
-    GUEST_RATE_LIMIT_PER_MINUTE,
-    GUEST_RATE_LIMIT_WINDOW_MS
-  );
+  let rateLimit;
+  try {
+    rateLimit = await checkGuestAIRateLimit(input.clientKey);
+  } catch (error) {
+    if (error instanceof GuestRateLimitConfigError) {
+      throw new AIProviderError(error.message, false);
+    }
+    throw error;
+  }
+
   if (!rateLimit.allowed) {
+    const seconds = Math.max(1, Math.ceil(rateLimit.retryAfterMs / 1000));
     throw new AIProviderError(
-      "Has alcanzado el límite de solicitudes en modo invitado. Espera un minuto o crea una cuenta gratuita para un límite mayor.",
+      `Has alcanzado el límite de solicitudes en modo invitado. Inténtalo de nuevo en ${seconds} segundos o crea una cuenta gratuita para un límite mayor.`,
       true
     );
   }
