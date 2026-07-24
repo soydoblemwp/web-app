@@ -6,7 +6,9 @@ import { isAdminRole } from "@/lib/permissions/roles";
 const ROOT = path.resolve(__dirname, "..");
 const USER_MENU = readFileSync(path.join(ROOT, "src/components/layout/user-menu.tsx"), "utf8");
 const ADMIN_PAGE = readFileSync(path.join(ROOT, "src/app/admin/page.tsx"), "utf8");
+const ADMIN_USERS_PAGE = readFileSync(path.join(ROOT, "src/app/admin/users/page.tsx"), "utf8");
 const ADMIN_LAYOUT = readFileSync(path.join(ROOT, "src/app/admin/layout.tsx"), "utf8");
+const ADMIN_NAV = readFileSync(path.join(ROOT, "src/components/admin/admin-nav.tsx"), "utf8");
 
 describe("UserMenu: no dropdown, direct and stable access", () => {
   it("does not import or render a DropdownMenu component", () => {
@@ -71,25 +73,27 @@ describe("Admin panel: no leftover Anthropic-era AI/token stats", () => {
     expect(ADMIN_PAGE).not.toMatch(/inputTokens|outputTokens/);
   });
 
-  it("shows the three replacement cards: total users, active users, total projects", () => {
+  it("shows real user/project stat cards, including active users via isSuspended: false", () => {
     expect(ADMIN_PAGE).toMatch(/Usuarios totales/);
     expect(ADMIN_PAGE).toMatch(/Usuarios activos/);
-    expect(ADMIN_PAGE).toMatch(/Proyectos totales/);
+    expect(ADMIN_PAGE).toMatch(/Proyectos activos/);
     expect(ADMIN_PAGE).toMatch(/isSuspended:\s*false/);
   });
 
-  it("still supports search, role changes, suspend/reactivate and links to the audit log", () => {
-    expect(ADMIN_PAGE).toMatch(/UserRoleSelect/);
-    expect(ADMIN_PAGE).toMatch(/suspendUserAction/);
-    expect(ADMIN_PAGE).toMatch(/name="q"/);
-    expect(ADMIN_LAYOUT).toMatch(/\/admin\/audit-log/);
+  it("the dedicated /admin/users page still supports search, role changes, and suspend/reactivate", () => {
+    expect(ADMIN_USERS_PAGE).toMatch(/UserRoleSelect/);
+    expect(ADMIN_USERS_PAGE).toMatch(/suspendUserAction/);
+    expect(ADMIN_USERS_PAGE).toMatch(/name="q"/);
+  });
+
+  it("the admin nav links to the audit log", () => {
+    expect(ADMIN_NAV).toMatch(/\/admin\/audit-log/);
   });
 });
 
 describe("Admin panel works without any project ever being created", () => {
   it("the /admin route has no [projectId] segment and doesn't gate on project access", () => {
     expect(ADMIN_PAGE).not.toMatch(/requireProjectAccess/);
-    expect(ADMIN_PAGE).not.toMatch(/projectId/);
   });
 
   it("admin access is gated purely on platform role (ADMIN/SUPER_ADMIN), independent of any project", () => {

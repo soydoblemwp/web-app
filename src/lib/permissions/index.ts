@@ -2,19 +2,9 @@ import "server-only";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db/prisma";
 import type { GlobalRole, ProjectRole } from "@/generated/prisma/enums";
-import { ADMIN_ROLES } from "@/lib/permissions/roles";
+import { ADMIN_ROLES, ForbiddenError, UnauthorizedError } from "@/lib/permissions/roles";
 
-export class UnauthorizedError extends Error {
-  constructor(message = "Debes iniciar sesión.") {
-    super(message);
-  }
-}
-
-export class ForbiddenError extends Error {
-  constructor(message = "No tienes permisos para realizar esta acción.") {
-    super(message);
-  }
-}
+export { ForbiddenError, UnauthorizedError } from "@/lib/permissions/roles";
 
 const PROJECT_ROLE_RANK: Record<ProjectRole, number> = {
   VIEWER: 0,
