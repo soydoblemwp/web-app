@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
+import { getCurrentUser } from "@/lib/permissions";
 import {
   Bot,
   FileText,
@@ -47,7 +49,13 @@ const faqs = [
   },
 ];
 
-export default function LandingPage() {
+export default async function LandingPage() {
+  // A signed-in visitor (any role) landing back on the public marketing page
+  // — e.g. via the root URL or browser back — belongs in the app, not the
+  // anonymous/guest entry point. Anonymous visitors are unaffected below.
+  const user = await getCurrentUser();
+  if (user) redirect("/dashboard");
+
   return (
     <div className="flex flex-1 flex-col">
       <header className="border-b">
