@@ -9,11 +9,12 @@ import { Label } from "@/components/ui/label";
 
 const initialState: LoginFormState = {};
 
-export function LoginForm() {
+export function LoginForm({ callbackUrl }: { callbackUrl?: string }) {
   const [state, formAction, isPending] = useActionState(loginAction, initialState);
 
   return (
     <form action={formAction} className="space-y-4">
+      {callbackUrl ? <input type="hidden" name="callbackUrl" value={callbackUrl} /> : null}
       <div className="space-y-2">
         <Label htmlFor="email">Correo electrónico</Label>
         <Input id="email" name="email" type="email" autoComplete="email" required />

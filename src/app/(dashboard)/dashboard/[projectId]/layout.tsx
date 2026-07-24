@@ -16,8 +16,9 @@ export default async function ProjectLayout({
   const user = await getCurrentUser();
   if (!user) redirect("/login");
 
-  const isPlatformAdmin = user.role === "ADMIN" || user.role === "SUPER_ADMIN";
-  const project = await getProjectForUser(user.id, projectId, isPlatformAdmin);
+  // Real membership only — an ADMIN/SUPER_ADMIN role grants access to /admin,
+  // not to other users' projects from within the normal app.
+  const project = await getProjectForUser(user.id, projectId);
   if (!project) notFound();
 
   const [projects, unreadNotifications] = await Promise.all([

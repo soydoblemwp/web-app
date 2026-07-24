@@ -74,13 +74,18 @@ export async function getProjectRole(
  * Enforces project-level access control on the server. Always call this
  * inside server actions/route handlers before touching project-scoped data —
  * never rely on the client only hiding UI for unauthorized roles.
+ *
+ * Deliberately requires real project membership regardless of platform role:
+ * ADMIN/SUPER_ADMIN get no bypass here. Their extra privileges apply only to
+ * /admin (see requireAdmin/requireSuperAdmin and src/app/admin), which reads
+ * data directly rather than through this function — the normal app must
+ * never let an admin role act on another user's project.
  */
 export async function requireProjectAccess(
   projectId: string,
   minRole: ProjectRole = "VIEWER"
 ): Promise<CurrentUser> {
   const user = await requireUser();
-  if (ADMIN_ROLES.includes(user.role)) return user;
 
   const role = await getProjectRole(user.id, projectId);
   if (!role || PROJECT_ROLE_RANK[role] < PROJECT_ROLE_RANK[minRole]) {

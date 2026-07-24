@@ -3,6 +3,7 @@
 import { AuthError } from "next-auth";
 import { signIn } from "@/auth";
 import { loginSchema } from "@/lib/validation/auth";
+import { isSafeRedirectTarget } from "@/lib/auth/safe-redirect";
 
 export interface LoginFormState {
   error?: string;
@@ -21,11 +22,17 @@ export async function loginAction(
     return { error: parsed.error.issues[0]?.message ?? "Datos no válidos." };
   }
 
+  const requestedCallbackUrl = formData.get("callbackUrl");
+  const redirectTo =
+    typeof requestedCallbackUrl === "string" && isSafeRedirectTarget(requestedCallbackUrl)
+      ? requestedCallbackUrl
+      : "/dashboard";
+
   try {
     await signIn("credentials", {
       email: parsed.data.email.toLowerCase(),
       password: parsed.data.password,
-      redirectTo: "/dashboard",
+      redirectTo,
     });
     return {};
   } catch (error) {

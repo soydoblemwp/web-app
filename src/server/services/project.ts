@@ -10,13 +10,19 @@ export async function listProjectsForUser(userId: string) {
   });
 }
 
-export async function getProjectForUser(userId: string, projectId: string, isPlatformAdmin: boolean) {
+/**
+ * Used by the normal (non-admin) app only. Deliberately requires real
+ * membership regardless of platform role — ADMIN/SUPER_ADMIN see only their
+ * own projects here, same as any other user. Global cross-user visibility
+ * belongs exclusively to /admin (see src/app/admin/projects/[projectId]),
+ * which queries Prisma directly instead of going through this function.
+ */
+export async function getProjectForUser(userId: string, projectId: string) {
   const project = await prisma.project.findUnique({
     where: { id: projectId },
     include: { brandKit: true },
   });
   if (!project) return null;
-  if (isPlatformAdmin) return project;
   const role = await getProjectRole(userId, projectId);
   if (!role) return null;
   return project;
