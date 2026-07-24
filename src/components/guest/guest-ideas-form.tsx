@@ -1,9 +1,11 @@
 "use client";
 
-import { useActionState, useEffect } from "react";
-import { generateGuestSocialIdeasAction } from "@/server/actions/guest";
+import { useState } from "react";
 import { socialPlatformValues } from "@/lib/validation/social";
+import { buildSocialIdeasPrompt, buildSocialIdeasSystemPrompt } from "@/lib/ai/prompts/guest";
 import { useGuestDrafts, GuestDraftsPanel } from "@/components/guest/guest-drafts-panel";
+import { useLocalAI } from "@/hooks/use-local-ai";
+import { LocalAIStatusPanel } from "@/components/ai/local-ai-status";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,17 +19,44 @@ import {
 } from "@/components/ui/select";
 
 export function GuestIdeasForm() {
-  const [state, formAction, isPending] = useActionState(generateGuestSocialIdeasAction, {});
+  const ai = useLocalAI();
   const { drafts, addDraft, removeDraft } = useGuestDrafts("ideas");
+  const [result, setResult] = useState<string | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
+  const busy = ai.status === "loading" || ai.status === "generating";
 
-  useEffect(() => {
-    if (state.text && state.title) addDraft(state.title, state.text);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.text]);
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setFormError(null);
+
+    const formData = new FormData(event.currentTarget);
+    const topic = String(formData.get("topic") ?? "").trim();
+    if (!topic) return setFormError("Describe sobre qué quieres ideas.");
+    if (topic.length > 1000) return setFormError("El tema es demasiado largo.");
+
+    const countRaw = Number(formData.get("count") ?? 5);
+    const count = Number.isFinite(countRaw) ? Math.min(Math.max(Math.round(countRaw), 1), 10) : 5;
+    const platform = String(formData.get("platform") ?? "Instagram");
+
+    const system = buildSocialIdeasSystemPrompt();
+    const prompt = buildSocialIdeasPrompt({
+      topic,
+      platform,
+      tone: String(formData.get("tone") ?? "Cercano y profesional"),
+      language: String(formData.get("language") ?? "es").trim() || "es",
+      count,
+    });
+
+    const text = await ai.generate({ system, prompt });
+    if (text) {
+      setResult(text);
+      addDraft(`Ideas para ${platform}: ${topic}`, text);
+    }
+  }
 
   return (
     <div className="space-y-6">
-      <form action={formAction} className="space-y-4">
+      <form onSubmit={handleSubmit} className="space-y-4">
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-2">
             <Label htmlFor="platform">Plataforma</Label>
@@ -62,15 +91,16 @@ export function GuestIdeasForm() {
           </div>
         </div>
 
-        {state.error ? <p className="text-sm text-destructive">{state.error}</p> : null}
-        <Button type="submit" disabled={isPending}>
-          {isPending ? "Generando..." : "Generar ideas"}
+        {formError ? <p className="text-sm text-destructive">{formError}</p> : null}
+        <LocalAIStatusPanel ai={ai} />
+        <Button type="submit" disabled={busy}>
+          {busy ? "Generando..." : "Generar ideas"}
         </Button>
       </form>
 
-      {state.text ? (
+      {result ? (
         <div className="rounded-lg border bg-muted/30 p-4">
-          <p className="whitespace-pre-wrap text-sm">{state.text}</p>
+          <p className="whitespace-pre-wrap text-sm">{result}</p>
         </div>
       ) : null}
 

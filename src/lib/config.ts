@@ -12,14 +12,3 @@ export const appConfig = {
   defaultLocale: "es",
   defaultTimezone: "UTC",
 } as const;
-
-// Non-secret AI configuration only. Whether the Anthropic API key is
-// configured lives in src/lib/env/server.ts (isAnthropicConfigured) — that
-// module is the only place allowed to read or check ANTHROPIC_API_KEY.
-export const aiConfig = {
-  provider: process.env.AI_PROVIDER ?? "anthropic",
-  model: process.env.AI_MODEL ?? "claude-sonnet-4-5",
-  maxOutputTokens: Number(process.env.AI_MAX_TOKENS ?? 2048),
-  requestTimeoutMs: Number(process.env.AI_REQUEST_TIMEOUT ?? 30_000),
-  maxInputCharacters: 20_000,
-} as const;

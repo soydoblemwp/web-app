@@ -4,80 +4,67 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db/prisma";
 import { requireProjectAccess } from "@/lib/permissions";
-import { generateContentSchema, updateContentItemSchema } from "@/lib/validation/content";
-import { generateAIContent } from "@/lib/ai/service";
-import { AIProviderError } from "@/lib/ai/types";
-import { buildBrandContext } from "@/lib/ai/brand-context";
-import { buildContentGenerationPrompt, buildContentGenerationSystemPrompt } from "@/lib/ai/prompts/content";
+import { updateContentItemSchema } from "@/lib/validation/content";
+import { LOCAL_MODEL_ID } from "@/lib/ai/local/model-config";
+import type { ContentType } from "@/generated/prisma/enums";
 
-export interface GenerateContentFormState {
+export interface SaveGeneratedContentInput {
+  projectId: string;
+  type: ContentType;
+  topic: string;
+  body: string;
+  language: string;
+  audience?: string;
+  tone?: string;
+  keywords?: string;
+  cta?: string;
+}
+
+export interface SaveGeneratedContentState {
   error?: string;
 }
 
-export async function generateContentAction(
-  _prevState: GenerateContentFormState,
-  formData: FormData
-): Promise<GenerateContentFormState> {
-  const projectId = String(formData.get("projectId") ?? "");
-  const user = await requireProjectAccess(projectId, "EDITOR");
+/**
+ * Persists a piece of content the browser already generated locally (see
+ * src/lib/ai/local). No AI runs here — this action only ever receives the
+ * final text, never a prompt, and never talks to any AI provider.
+ */
+export async function saveGeneratedContentAction(
+  input: SaveGeneratedContentInput
+): Promise<SaveGeneratedContentState | never> {
+  const user = await requireProjectAccess(input.projectId, "EDITOR");
 
-  const parsed = generateContentSchema.safeParse({
-    projectId,
-    type: formData.get("type"),
-    topic: formData.get("topic"),
-    objective: formData.get("objective") ?? "",
-    audience: formData.get("audience") ?? "",
-    tone: formData.get("tone") ?? "",
-    language: formData.get("language") || "es",
-    keywords: formData.get("keywords") ?? "",
-    forbiddenWords: formData.get("forbiddenWords") ?? "",
-    cta: formData.get("cta") ?? "",
-    useBrandKit: formData.get("useBrandKit") === "on",
-  });
+  if (!input.topic.trim()) return { error: "Describe el tema del contenido." };
+  if (!input.body.trim()) return { error: "No hay contenido generado que guardar." };
 
-  if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Datos no válidos." };
-  }
-
-  const project = await prisma.project.findUniqueOrThrow({ where: { id: projectId } });
-  const brandKit = parsed.data.useBrandKit
-    ? await prisma.brandKit.findUnique({ where: { projectId }, include: { terms: true } })
-    : null;
-
-  const system = buildContentGenerationSystemPrompt(buildBrandContext(project, brandKit));
-  const prompt = buildContentGenerationPrompt(parsed.data);
-
-  let generated;
-  try {
-    generated = await generateAIContent({
-      projectId,
-      userId: user.id,
-      kind: "CONTENT_GENERATION",
-      system,
-      prompt,
-    });
-  } catch (error) {
-    return { error: error instanceof AIProviderError ? error.message : "No se pudo generar el contenido." };
-  }
-
-  const title = parsed.data.topic.slice(0, 120);
+  const title = input.topic.slice(0, 120);
   const contentItem = await prisma.contentItem.create({
     data: {
-      projectId,
+      projectId: input.projectId,
       authorId: user.id,
-      type: parsed.data.type,
+      type: input.type,
       title,
-      body: generated.text,
-      language: parsed.data.language,
-      targetAudience: parsed.data.audience || null,
-      tone: parsed.data.tone || null,
-      keywords: parsed.data.keywords ? parsed.data.keywords.split(",").map((k) => k.trim()).filter(Boolean) : [],
-      cta: parsed.data.cta || null,
+      body: input.body,
+      language: input.language,
+      targetAudience: input.audience || null,
+      tone: input.tone || null,
+      keywords: input.keywords ? input.keywords.split(",").map((k) => k.trim()).filter(Boolean) : [],
+      cta: input.cta || null,
     },
   });
 
-  revalidatePath(`/dashboard/${projectId}/content`);
-  redirect(`/dashboard/${projectId}/content/${contentItem.id}`);
+  await prisma.aIUsage.create({
+    data: {
+      projectId: input.projectId,
+      userId: user.id,
+      kind: "CONTENT_GENERATION",
+      provider: "local-browser",
+      model: LOCAL_MODEL_ID,
+    },
+  });
+
+  revalidatePath(`/dashboard/${input.projectId}/content`);
+  redirect(`/dashboard/${input.projectId}/content/${contentItem.id}`);
 }
 
 export async function updateContentItemAction(projectId: string, formData: FormData) {

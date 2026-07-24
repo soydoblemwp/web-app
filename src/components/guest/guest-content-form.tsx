@@ -1,9 +1,12 @@
 "use client";
 
-import { useActionState, useEffect } from "react";
-import { generateGuestContentAction } from "@/server/actions/guest";
+import { useState } from "react";
 import { contentTypeValues } from "@/lib/validation/content";
+import { buildContentGenerationPrompt, buildContentGenerationSystemPrompt } from "@/lib/ai/prompts/content";
+import { GUEST_CONTEXT_NOTE } from "@/lib/ai/prompts/guest";
 import { useGuestDrafts, GuestDraftsPanel } from "@/components/guest/guest-drafts-panel";
+import { useLocalAI } from "@/hooks/use-local-ai";
+import { LocalAIStatusPanel } from "@/components/ai/local-ai-status";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,6 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import type { ContentType } from "@/generated/prisma/enums";
 
 const TYPE_LABELS: Record<string, string> = {
   ARTICLE: "Artículo",
@@ -37,17 +41,49 @@ const TYPE_LABELS: Record<string, string> = {
 };
 
 export function GuestContentForm() {
-  const [state, formAction, isPending] = useActionState(generateGuestContentAction, {});
+  const ai = useLocalAI();
   const { drafts, addDraft, removeDraft } = useGuestDrafts("content");
+  const [result, setResult] = useState<string | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
+  const busy = ai.status === "loading" || ai.status === "generating";
 
-  useEffect(() => {
-    if (state.text && state.title) addDraft(state.title, state.text);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.text]);
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setFormError(null);
+
+    const formData = new FormData(event.currentTarget);
+    const topic = String(formData.get("topic") ?? "").trim();
+    if (!topic) return setFormError("Describe el tema del contenido.");
+    if (topic.length > 2000) return setFormError("El tema es demasiado largo.");
+
+    const type = String(formData.get("type") ?? "BLOG_POST") as ContentType;
+    const language = String(formData.get("language") ?? "es").trim() || "es";
+
+    const system = buildContentGenerationSystemPrompt(GUEST_CONTEXT_NOTE);
+    const prompt = buildContentGenerationPrompt({
+      projectId: "guest",
+      type,
+      topic,
+      objective: String(formData.get("objective") ?? ""),
+      audience: String(formData.get("audience") ?? ""),
+      tone: String(formData.get("tone") ?? ""),
+      language,
+      keywords: String(formData.get("keywords") ?? ""),
+      forbiddenWords: String(formData.get("forbiddenWords") ?? ""),
+      cta: String(formData.get("cta") ?? ""),
+      useBrandKit: false,
+    });
+
+    const text = await ai.generate({ system, prompt });
+    if (text) {
+      setResult(text);
+      addDraft(topic, text);
+    }
+  }
 
   return (
     <div className="space-y-6">
-      <form action={formAction} className="space-y-4">
+      <form onSubmit={handleSubmit} className="space-y-4">
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-2">
             <Label htmlFor="type">Tipo de contenido</Label>
@@ -90,15 +126,16 @@ export function GuestContentForm() {
           </div>
         </div>
 
-        {state.error ? <p className="text-sm text-destructive">{state.error}</p> : null}
-        <Button type="submit" disabled={isPending}>
-          {isPending ? "Generando..." : "Generar con IA"}
+        {formError ? <p className="text-sm text-destructive">{formError}</p> : null}
+        <LocalAIStatusPanel ai={ai} />
+        <Button type="submit" disabled={busy}>
+          {busy ? "Generando..." : "Generar con IA"}
         </Button>
       </form>
 
-      {state.text ? (
+      {result ? (
         <div className="rounded-lg border bg-muted/30 p-4">
-          <p className="whitespace-pre-wrap text-sm">{state.text}</p>
+          <p className="whitespace-pre-wrap text-sm">{result}</p>
         </div>
       ) : null}
 

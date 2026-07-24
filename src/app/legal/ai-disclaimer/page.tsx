@@ -21,6 +21,13 @@ export default function AIDisclaimerPage() {
         Los modelos de IA pueden cometer errores o generar afirmaciones inexactas. Las puntuaciones SEO y los
         análisis de contenido combinan reglas deterministas con sugerencias de IA claramente diferenciadas.
       </p>
+      <h2>Dónde se ejecuta la IA</h2>
+      <p>
+        La generación de texto se ejecuta localmente en tu navegador (no en nuestros servidores ni en los de
+        ningún tercero). La primera vez que uses una función de IA, el navegador descarga un modelo y lo
+        ejecuta mediante WebGPU. Ni tus indicaciones (prompts) ni el contenido generado se envían a ningún
+        proveedor externo de inteligencia artificial.
+      </p>
     </LegalPage>
   );
 }

@@ -1,8 +1,11 @@
 "use client";
 
-import { useActionState } from "react";
-import { generateContentAction, type GenerateContentFormState } from "@/server/actions/content";
-import { contentTypeValues } from "@/lib/validation/content";
+import { useState } from "react";
+import { generateContentSchema, contentTypeValues } from "@/lib/validation/content";
+import { buildContentGenerationPrompt, buildContentGenerationSystemPrompt } from "@/lib/ai/prompts/content";
+import { saveGeneratedContentAction } from "@/server/actions/content";
+import { useLocalAI } from "@/hooks/use-local-ai";
+import { LocalAIStatusPanel } from "@/components/ai/local-ai-status";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,8 +18,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-
-const initialState: GenerateContentFormState = {};
 
 const TYPE_LABELS: Record<string, string> = {
   ARTICLE: "Artículo",
@@ -38,13 +39,66 @@ const TYPE_LABELS: Record<string, string> = {
   OTHER: "Otro",
 };
 
-export function GenerateContentForm({ projectId }: { projectId: string }) {
-  const [state, formAction, isPending] = useActionState(generateContentAction, initialState);
+export function GenerateContentForm({
+  projectId,
+  brandContextText,
+}: {
+  projectId: string;
+  brandContextText: string;
+}) {
+  const ai = useLocalAI();
+  const [formError, setFormError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const busy = ai.status === "loading" || ai.status === "generating" || saving;
+
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setFormError(null);
+
+    const formData = new FormData(event.currentTarget);
+    const parsed = generateContentSchema.safeParse({
+      projectId,
+      type: formData.get("type"),
+      topic: formData.get("topic"),
+      objective: formData.get("objective") ?? "",
+      audience: formData.get("audience") ?? "",
+      tone: formData.get("tone") ?? "",
+      language: formData.get("language") || "es",
+      keywords: formData.get("keywords") ?? "",
+      forbiddenWords: formData.get("forbiddenWords") ?? "",
+      cta: formData.get("cta") ?? "",
+      useBrandKit: formData.get("useBrandKit") === "on",
+    });
+
+    if (!parsed.success) {
+      setFormError(parsed.error.issues[0]?.message ?? "Datos no válidos.");
+      return;
+    }
+
+    const system = buildContentGenerationSystemPrompt(parsed.data.useBrandKit ? brandContextText : "");
+    const prompt = buildContentGenerationPrompt(parsed.data);
+
+    const text = await ai.generate({ system, prompt });
+    if (!text) return;
+
+    setSaving(true);
+    const result = await saveGeneratedContentAction({
+      projectId,
+      type: parsed.data.type,
+      topic: parsed.data.topic,
+      body: text,
+      language: parsed.data.language,
+      audience: parsed.data.audience,
+      tone: parsed.data.tone,
+      keywords: parsed.data.keywords,
+      cta: parsed.data.cta,
+    });
+    setSaving(false);
+    if (result?.error) setFormError(result.error);
+  }
 
   return (
-    <form action={formAction} className="space-y-4">
-      <input type="hidden" name="projectId" value={projectId} />
-
+    <form onSubmit={handleSubmit} className="space-y-4">
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
           <Label htmlFor="type">Tipo de contenido</Label>
@@ -102,10 +156,11 @@ export function GenerateContentForm({ projectId }: { projectId: string }) {
         </Label>
       </div>
 
-      {state.error ? <p className="text-sm text-destructive">{state.error}</p> : null}
+      {formError ? <p className="text-sm text-destructive">{formError}</p> : null}
+      <LocalAIStatusPanel ai={ai} />
 
-      <Button type="submit" disabled={isPending}>
-        {isPending ? "Generando..." : "Generar con IA"}
+      <Button type="submit" disabled={busy}>
+        {saving ? "Guardando..." : busy ? "Generando..." : "Generar con IA"}
       </Button>
     </form>
   );

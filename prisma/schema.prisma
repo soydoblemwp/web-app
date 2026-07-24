@@ -170,7 +170,6 @@ enum AutomationRunStatus {
 enum IntegrationType {
   WORDPRESS
   GITHUB
-  ANTHROPIC
   EMAIL
   STORAGE
 }
@@ -227,29 +226,29 @@ enum FileProcessingStatus {
 // ---------------------------------------------------------------------------
 
 model User {
-  id             String     @id @default(cuid())
-  name           String?
-  email          String     @unique
-  emailVerified  DateTime?
-  image          String?
-  passwordHash   String?
-  role           GlobalRole @default(USER)
-  isSuspended    Boolean    @default(false)
-  timezone       String     @default("UTC")
-  locale         String     @default("es")
-  createdAt      DateTime   @default(now())
-  updatedAt      DateTime   @updatedAt
+  id            String     @id @default(cuid())
+  name          String?
+  email         String     @unique
+  emailVerified DateTime?
+  image         String?
+  passwordHash  String?
+  role          GlobalRole @default(USER)
+  isSuspended   Boolean    @default(false)
+  timezone      String     @default("UTC")
+  locale        String     @default("es")
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
 
   accounts             Account[]
   sessions             Session[]
   workspaceMemberships WorkspaceMember[]
   projectMemberships   ProjectMember[]
-  ownedWorkspaces      Workspace[]        @relation("WorkspaceOwner")
-  contentItems         ContentItem[]      @relation("ContentAuthor")
-  contentVersions      ContentVersion[]   @relation("ContentVersionAuthor")
-  socialPosts          SocialPost[]       @relation("SocialPostAuthor")
-  campaigns            Campaign[]         @relation("CampaignOwner")
-  collaborations       Collaboration[]    @relation("CollaborationOwner")
+  ownedWorkspaces      Workspace[]       @relation("WorkspaceOwner")
+  contentItems         ContentItem[]     @relation("ContentAuthor")
+  contentVersions      ContentVersion[]  @relation("ContentVersionAuthor")
+  socialPosts          SocialPost[]      @relation("SocialPostAuthor")
+  campaigns            Campaign[]        @relation("CampaignOwner")
+  collaborations       Collaboration[]   @relation("CollaborationOwner")
   aiConversations      AIConversation[]
   aiUsageEvents        AIUsage[]
   notifications        Notification[]
@@ -310,10 +309,10 @@ model Workspace {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  owner       User              @relation("WorkspaceOwner", fields: [ownerId], references: [id])
-  members     WorkspaceMember[]
-  projects    Project[]
-  subscription Subscription?
+  owner         User              @relation("WorkspaceOwner", fields: [ownerId], references: [id])
+  members       WorkspaceMember[]
+  projects      Project[]
+  subscription  Subscription?
   usageCounters UsageCounter[]
   featureFlags  FeatureFlag[]
   auditLogs     AuditLog[]
@@ -336,23 +335,23 @@ model WorkspaceMember {
 }
 
 model Project {
-  id            String        @id @default(cuid())
-  workspaceId   String
-  ownerId       String
-  name          String
-  description   String?
-  logoUrl       String?
-  website       String?
-  industry      String?
-  targetAudience String?
-  primaryLanguage String      @default("es")
-  market        String?
-  timezone      String        @default("UTC")
-  tone          String?
-  goals         String?
-  status        ProjectStatus @default(ACTIVE)
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+  id              String        @id @default(cuid())
+  workspaceId     String
+  ownerId         String
+  name            String
+  description     String?
+  logoUrl         String?
+  website         String?
+  industry        String?
+  targetAudience  String?
+  primaryLanguage String        @default("es")
+  market          String?
+  timezone        String        @default("UTC")
+  tone            String?
+  goals           String?
+  status          ProjectStatus @default(ACTIVE)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
 
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
@@ -373,7 +372,6 @@ model Project {
   githubConnection    GitHubConnection?
   aiConversations     AIConversation[]
   aiUsageEvents       AIUsage[]
-  aiResults           AIResult[]
   notifications       Notification[]
   fileAssets          FileAsset[]
   seoAnalyses         SeoAnalysis[]
@@ -401,36 +399,36 @@ model ProjectMember {
 // ---------------------------------------------------------------------------
 
 model BrandKit {
-  id                String   @id @default(cuid())
-  projectId         String   @unique
-  name              String?
-  tagline           String?
-  description       String?
-  personality       String?
-  tone              String?
-  valueProposition  String?
-  commonCTAs        String?
-  primaryLinks      String?
-  colors            String[] @default([])
-  logoUrl           String?
-  fontReferences    String?
-  competitors        String?
-  additionalNotes   String?
-  approvedExamples  String?
-  isActiveForAI     Boolean  @default(true)
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  id               String   @id @default(cuid())
+  projectId        String   @unique
+  name             String?
+  tagline          String?
+  description      String?
+  personality      String?
+  tone             String?
+  valueProposition String?
+  commonCTAs       String?
+  primaryLinks     String?
+  colors           String[] @default([])
+  logoUrl          String?
+  fontReferences   String?
+  competitors      String?
+  additionalNotes  String?
+  approvedExamples String?
+  isActiveForAI    Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
   project Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
   terms   BrandTerm[]
 }
 
 model BrandTerm {
-  id         String   @id @default(cuid())
-  brandKitId String
-  term       String
-  isForbidden Boolean @default(false)
-  createdAt  DateTime @default(now())
+  id          String   @id @default(cuid())
+  brandKitId  String
+  term        String
+  isForbidden Boolean  @default(false)
+  createdAt   DateTime @default(now())
 
   brandKit BrandKit @relation(fields: [brandKitId], references: [id], onDelete: Cascade)
 
@@ -462,42 +460,42 @@ model Tag {
   name      String
   createdAt DateTime @default(now())
 
-  project      Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  contentTags  ContentTag[]
+  project     Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  contentTags ContentTag[]
 
   @@unique([projectId, name])
 }
 
 model ContentItem {
-  id            String        @id @default(cuid())
-  projectId     String
-  authorId      String
-  folderId      String?
-  type          ContentType
-  title         String
-  body          String        @db.Text
-  status        ContentStatus @default(DRAFT)
-  language      String        @default("es")
-  targetAudience String?
-  tone          String?
-  keywords      String[]      @default([])
-  cta           String?
-  isFavorite    Boolean       @default(false)
-  isArchived    Boolean       @default(false)
-  deletedAt     DateTime?
+  id              String        @id @default(cuid())
+  projectId       String
+  authorId        String
+  folderId        String?
+  type            ContentType
+  title           String
+  body            String        @db.Text
+  status          ContentStatus @default(DRAFT)
+  language        String        @default("es")
+  targetAudience  String?
+  tone            String?
+  keywords        String[]      @default([])
+  cta             String?
+  isFavorite      Boolean       @default(false)
+  isArchived      Boolean       @default(false)
+  deletedAt       DateTime?
   sourceContentId String?
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
 
-  project        Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  author         User             @relation("ContentAuthor", fields: [authorId], references: [id])
-  folder         Folder?          @relation(fields: [folderId], references: [id])
-  sourceContent  ContentItem?     @relation("ContentDerivations", fields: [sourceContentId], references: [id])
-  derivedContent ContentItem[]    @relation("ContentDerivations")
+  project        Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  author         User              @relation("ContentAuthor", fields: [authorId], references: [id])
+  folder         Folder?           @relation(fields: [folderId], references: [id])
+  sourceContent  ContentItem?      @relation("ContentDerivations", fields: [sourceContentId], references: [id])
+  derivedContent ContentItem[]     @relation("ContentDerivations")
   versions       ContentVersion[]
   tags           ContentTag[]
   campaignLinks  CampaignContent[]
-  socialPosts    SocialPost[]     @relation("SocialPostSourceContent")
+  socialPosts    SocialPost[]      @relation("SocialPostSourceContent")
 
   @@index([projectId, status])
   @@index([authorId])
@@ -553,25 +551,25 @@ model SeoAnalysis {
 // ---------------------------------------------------------------------------
 
 model Campaign {
-  id           String         @id @default(cuid())
-  projectId    String
-  ownerId      String
-  name         String
-  description  String?
-  objective    String?
-  audience     String?
+  id               String           @id @default(cuid())
+  projectId        String
+  ownerId          String
+  name             String
+  description      String?
+  objective        String?
+  audience         String?
   productOrService String?
-  startDate    DateTime?
-  endDate      DateTime?
-  platforms    SocialPlatform[] @default([])
-  frequency    String?
-  budget       Decimal?       @db.Decimal(12, 2)
-  primaryCTA   String?
-  links        String[]       @default([])
-  tags         String[]       @default([])
-  status       CampaignStatus @default(DRAFT)
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @updatedAt
+  startDate        DateTime?
+  endDate          DateTime?
+  platforms        SocialPlatform[] @default([])
+  frequency        String?
+  budget           Decimal?         @db.Decimal(12, 2)
+  primaryCTA       String?
+  links            String[]         @default([])
+  tags             String[]         @default([])
+  status           CampaignStatus   @default(DRAFT)
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
 
   project  Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
   owner    User              @relation("CampaignOwner", fields: [ownerId], references: [id])
@@ -596,28 +594,28 @@ model CampaignContent {
 // ---------------------------------------------------------------------------
 
 model SocialPost {
-  id               String           @id @default(cuid())
-  projectId        String
-  authorId         String
-  campaignId       String?
-  sourceContentId  String?
-  platform         SocialPlatform
-  postType         String
-  internalTitle    String?
-  text             String           @db.Text
-  status           SocialPostStatus @default(IDEA)
-  scheduledAt      DateTime?
-  timezone         String           @default("UTC")
-  tags             String[]         @default([])
-  cta              String?
-  hashtags         String[]         @default([])
-  link             String?
-  notes            String?
-  result           String?
-  publishedAt      DateTime?
-  externalId       String?
-  createdAt        DateTime         @default(now())
-  updatedAt        DateTime         @updatedAt
+  id              String           @id @default(cuid())
+  projectId       String
+  authorId        String
+  campaignId      String?
+  sourceContentId String?
+  platform        SocialPlatform
+  postType        String
+  internalTitle   String?
+  text            String           @db.Text
+  status          SocialPostStatus @default(IDEA)
+  scheduledAt     DateTime?
+  timezone        String           @default("UTC")
+  tags            String[]         @default([])
+  cta             String?
+  hashtags        String[]         @default([])
+  link            String?
+  notes           String?
+  result          String?
+  publishedAt     DateTime?
+  externalId      String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
 
   project       Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
   author        User                @relation("SocialPostAuthor", fields: [authorId], references: [id])
@@ -645,18 +643,18 @@ model SocialPostVersion {
 }
 
 model SocialPlatformConnection {
-  id              String            @id @default(cuid())
-  projectId       String
-  platform        SocialPlatform
-  status          IntegrationStatus @default(NOT_CONFIGURED)
-  externalAccountId String?
-  displayName     String?
-  encryptedAccessToken  String?      @db.Text
-  encryptedRefreshToken String?      @db.Text
-  tokenExpiresAt  DateTime?
-  lastVerifiedAt  DateTime?
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
+  id                    String            @id @default(cuid())
+  projectId             String
+  platform              SocialPlatform
+  status                IntegrationStatus @default(NOT_CONFIGURED)
+  externalAccountId     String?
+  displayName           String?
+  encryptedAccessToken  String?           @db.Text
+  encryptedRefreshToken String?           @db.Text
+  tokenExpiresAt        DateTime?
+  lastVerifiedAt        DateTime?
+  createdAt             DateTime          @default(now())
+  updatedAt             DateTime          @updatedAt
 
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
@@ -664,7 +662,7 @@ model SocialPlatformConnection {
 }
 
 model SocialMetric {
-  id           String         @id @default(cuid())
+  id           String   @id @default(cuid())
   socialPostId String
   source       String
   views        Int?
@@ -675,9 +673,9 @@ model SocialMetric {
   clicks       Int?
   newFollowers Int?
   conversions  Int?
-  revenue      Decimal?       @db.Decimal(12, 2)
+  revenue      Decimal? @db.Decimal(12, 2)
   currency     String?
-  recordedAt   DateTime       @default(now())
+  recordedAt   DateTime @default(now())
 
   socialPost SocialPost @relation(fields: [socialPostId], references: [id], onDelete: Cascade)
 
@@ -689,25 +687,25 @@ model SocialMetric {
 // ---------------------------------------------------------------------------
 
 model Collaboration {
-  id             String              @id @default(cuid())
-  projectId      String
-  ownerId        String
-  brandName      String
-  status         CollaborationStatus @default(LEAD)
-  productReceived String?
+  id                String              @id @default(cuid())
+  projectId         String
+  ownerId           String
+  brandName         String
+  status            CollaborationStatus @default(LEAD)
+  productReceived   String?
   collaborationType String?
-  agreedPayment  Decimal?            @db.Decimal(12, 2)
-  paidAmount     Decimal?            @db.Decimal(12, 2)
-  currency       String              @default("EUR")
-  contractUrl    String?
-  notes          String?
-  startDate      DateTime?
-  dueDate        DateTime?
-  createdAt      DateTime            @default(now())
-  updatedAt      DateTime            @updatedAt
+  agreedPayment     Decimal?            @db.Decimal(12, 2)
+  paidAmount        Decimal?            @db.Decimal(12, 2)
+  currency          String              @default("EUR")
+  contractUrl       String?
+  notes             String?
+  startDate         DateTime?
+  dueDate           DateTime?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
 
-  project      Project                     @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  owner        User                        @relation("CollaborationOwner", fields: [ownerId], references: [id])
+  project      Project                    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  owner        User                       @relation("CollaborationOwner", fields: [ownerId], references: [id])
   contacts     CollaborationContact[]
   deliverables CollaborationDeliverable[]
   payments     CollaborationPayment[]
@@ -765,20 +763,20 @@ model CollaborationPayment {
 // ---------------------------------------------------------------------------
 
 model Monitor {
-  id                String        @id @default(cuid())
-  projectId         String
-  name              String
-  url               String
-  checkFrequencyMinutes Int       @default(1440)
-  priceSelector     String?
-  availabilitySelector String?
-  lastStatus        MonitorStatus @default(UNKNOWN)
-  lastCheckedAt     DateTime?
-  isActive          Boolean       @default(true)
-  createdAt         DateTime      @default(now())
-  updatedAt         DateTime      @updatedAt
+  id                    String        @id @default(cuid())
+  projectId             String
+  name                  String
+  url                   String
+  checkFrequencyMinutes Int           @default(1440)
+  priceSelector         String?
+  availabilitySelector  String?
+  lastStatus            MonitorStatus @default(UNKNOWN)
+  lastCheckedAt         DateTime?
+  isActive              Boolean       @default(true)
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
 
-  project Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  project Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
   runs    MonitorRun[]
   changes MonitorChange[]
 
@@ -802,12 +800,12 @@ model MonitorRun {
 }
 
 model MonitorChange {
-  id          String   @id @default(cuid())
-  monitorId   String
-  field       String
-  oldValue    String?  @db.Text
-  newValue    String?  @db.Text
-  detectedAt  DateTime @default(now())
+  id         String   @id @default(cuid())
+  monitorId  String
+  field      String
+  oldValue   String?  @db.Text
+  newValue   String?  @db.Text
+  detectedAt DateTime @default(now())
 
   monitor Monitor @relation(fields: [monitorId], references: [id], onDelete: Cascade)
 
@@ -815,18 +813,18 @@ model MonitorChange {
 }
 
 model LinkCheck {
-  id             String          @id @default(cuid())
-  projectId      String
-  url            String
-  status         LinkCheckStatus @default(UNKNOWN)
-  httpStatus     Int?
-  finalUrl       String?
-  durationMs     Int?
-  attemptCount   Int             @default(0)
-  isIgnored      Boolean         @default(false)
-  errorMessage   String?
-  lastCheckedAt  DateTime?
-  createdAt      DateTime        @default(now())
+  id            String          @id @default(cuid())
+  projectId     String
+  url           String
+  status        LinkCheckStatus @default(UNKNOWN)
+  httpStatus    Int?
+  finalUrl      String?
+  durationMs    Int?
+  attemptCount  Int             @default(0)
+  isIgnored     Boolean         @default(false)
+  errorMessage  String?
+  lastCheckedAt DateTime?
+  createdAt     DateTime        @default(now())
 
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
@@ -838,18 +836,18 @@ model LinkCheck {
 // ---------------------------------------------------------------------------
 
 model Automation {
-  id          String                @id @default(cuid())
-  projectId   String
-  name        String
-  description String?
-  triggerType AutomationTriggerType
+  id            String                @id @default(cuid())
+  projectId     String
+  name          String
+  description   String?
+  triggerType   AutomationTriggerType
   triggerConfig Json?
-  conditions  Json?
-  isActive    Boolean               @default(true)
-  createdAt   DateTime              @default(now())
-  updatedAt   DateTime              @updatedAt
+  conditions    Json?
+  isActive      Boolean               @default(true)
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
 
-  project Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  project Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
   actions AutomationAction[]
   runs    AutomationRun[]
 
@@ -869,13 +867,13 @@ model AutomationAction {
 }
 
 model AutomationRun {
-  id           String              @id @default(cuid())
-  automationId String
-  status       AutomationRunStatus
-  message      String?
+  id             String              @id @default(cuid())
+  automationId   String
+  status         AutomationRunStatus
+  message        String?
   idempotencyKey String?
-  startedAt    DateTime            @default(now())
-  finishedAt   DateTime?
+  startedAt      DateTime            @default(now())
+  finishedAt     DateTime?
 
   automation Automation @relation(fields: [automationId], references: [id], onDelete: Cascade)
 
@@ -888,14 +886,14 @@ model AutomationRun {
 // ---------------------------------------------------------------------------
 
 model Integration {
-  id          String            @id @default(cuid())
-  projectId   String
-  type        IntegrationType
-  status      IntegrationStatus @default(NOT_CONFIGURED)
+  id            String            @id @default(cuid())
+  projectId     String
+  type          IntegrationType
+  status        IntegrationStatus @default(NOT_CONFIGURED)
   lastCheckedAt DateTime?
-  lastError   String?
-  createdAt   DateTime          @default(now())
-  updatedAt   DateTime          @updatedAt
+  lastError     String?
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
 
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
@@ -903,29 +901,29 @@ model Integration {
 }
 
 model WordPressConnection {
-  id                 String            @id @default(cuid())
-  projectId          String            @unique
-  siteUrl            String
-  username           String
-  encryptedAppPassword String          @db.Text
-  status             IntegrationStatus @default(NOT_CONFIGURED)
-  lastVerifiedAt     DateTime?
-  createdAt          DateTime          @default(now())
-  updatedAt          DateTime          @updatedAt
+  id                   String            @id @default(cuid())
+  projectId            String            @unique
+  siteUrl              String
+  username             String
+  encryptedAppPassword String            @db.Text
+  status               IntegrationStatus @default(NOT_CONFIGURED)
+  lastVerifiedAt       DateTime?
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
 
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 }
 
 model GitHubConnection {
-  id               String            @id @default(cuid())
-  projectId        String            @unique
-  accountLogin     String
-  encryptedAccessToken String        @db.Text
-  status           IntegrationStatus @default(NOT_CONFIGURED)
-  scopes           String[]          @default([])
-  lastVerifiedAt   DateTime?
-  createdAt        DateTime          @default(now())
-  updatedAt        DateTime          @updatedAt
+  id                   String            @id @default(cuid())
+  projectId            String            @unique
+  accountLogin         String
+  encryptedAccessToken String            @db.Text
+  status               IntegrationStatus @default(NOT_CONFIGURED)
+  scopes               String[]          @default([])
+  lastVerifiedAt       DateTime?
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
 
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 }
@@ -962,19 +960,19 @@ model AIMessage {
 }
 
 model AIUsage {
-  id          String       @id @default(cuid())
-  projectId   String
-  userId      String
-  kind        AIResultKind
-  provider    String
-  model       String
-  inputTokens Int          @default(0)
-  outputTokens Int         @default(0)
-  latencyMs   Int?
-  wasCached   Boolean      @default(false)
-  wasError    Boolean      @default(false)
+  id           String       @id @default(cuid())
+  projectId    String
+  userId       String
+  kind         AIResultKind
+  provider     String
+  model        String
+  inputTokens  Int          @default(0)
+  outputTokens Int          @default(0)
+  latencyMs    Int?
+  wasCached    Boolean      @default(false)
+  wasError     Boolean      @default(false)
   errorMessage String?
-  createdAt   DateTime     @default(now())
+  createdAt    DateTime     @default(now())
 
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
   user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -983,35 +981,20 @@ model AIUsage {
   @@index([userId, createdAt])
 }
 
-model AIResult {
-  id          String       @id @default(cuid())
-  projectId   String
-  kind        AIResultKind
-  inputHash   String
-  prompt      String       @db.Text
-  output      String       @db.Text
-  createdAt   DateTime     @default(now())
-
-  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
-
-  @@unique([projectId, kind, inputHash])
-  @@index([projectId, kind])
-}
-
 // ---------------------------------------------------------------------------
 // Notifications & audit
 // ---------------------------------------------------------------------------
 
 model Notification {
-  id         String           @id @default(cuid())
-  projectId  String?
-  userId     String
-  type       NotificationType
-  title      String
-  message    String
+  id          String           @id @default(cuid())
+  projectId   String?
+  userId      String
+  type        NotificationType
+  title       String
+  message     String
   resourceUrl String?
-  isRead     Boolean          @default(false)
-  createdAt  DateTime         @default(now())
+  isRead      Boolean          @default(false)
+  createdAt   DateTime         @default(now())
 
   project Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
   user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -1041,35 +1024,35 @@ model AuditLog {
 // ---------------------------------------------------------------------------
 
 model Plan {
-  id                     String   @id @default(cuid())
-  tier                   PlanTier @unique
-  name                   String
-  maxProjects            Int
-  maxMembers             Int
-  maxAIGenerationsPerMonth Int
-  maxAITokensPerMonth    Int
-  maxAutomations         Int
-  maxMonitors            Int
+  id                         String   @id @default(cuid())
+  tier                       PlanTier @unique
+  name                       String
+  maxProjects                Int
+  maxMembers                 Int
+  maxAIGenerationsPerMonth   Int
+  maxAITokensPerMonth        Int
+  maxAutomations             Int
+  maxMonitors                Int
   minMonitorFrequencyMinutes Int
-  maxIntegrations        Int
-  maxStorageMb           Int
-  maxCampaigns           Int
-  priceMonthlyCents      Int      @default(0)
-  createdAt              DateTime @default(now())
-  updatedAt              DateTime @updatedAt
+  maxIntegrations            Int
+  maxStorageMb               Int
+  maxCampaigns               Int
+  priceMonthlyCents          Int      @default(0)
+  createdAt                  DateTime @default(now())
+  updatedAt                  DateTime @updatedAt
 
   subscriptions Subscription[]
 }
 
 model Subscription {
-  id          String    @id @default(cuid())
-  workspaceId String    @unique
-  planId      String
-  isActive    Boolean   @default(true)
-  currentPeriodStart DateTime @default(now())
+  id                 String    @id @default(cuid())
+  workspaceId        String    @unique
+  planId             String
+  isActive           Boolean   @default(true)
+  currentPeriodStart DateTime  @default(now())
   currentPeriodEnd   DateTime?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   plan      Plan      @relation(fields: [planId], references: [id])
@@ -1106,43 +1089,22 @@ model FeatureFlag {
 // ---------------------------------------------------------------------------
 
 model FileAsset {
-  id              String               @id @default(cuid())
-  projectId       String
-  ownerId         String
-  kind            FileKind
-  originalName    String
-  storageKey      String
-  url             String
-  mimeType        String
-  sizeBytes       Int
+  id               String               @id @default(cuid())
+  projectId        String
+  ownerId          String
+  kind             FileKind
+  originalName     String
+  storageKey       String
+  url              String
+  mimeType         String
+  sizeBytes        Int
   processingStatus FileProcessingStatus @default(READY)
-  socialPostId    String?
-  createdAt       DateTime             @default(now())
+  socialPostId     String?
+  createdAt        DateTime             @default(now())
 
   project    Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
   owner      User        @relation(fields: [ownerId], references: [id])
   socialPost SocialPost? @relation(fields: [socialPostId], references: [id])
 
   @@index([projectId])
-}
-
-// ---------------------------------------------------------------------------
-// Guest mode
-// ---------------------------------------------------------------------------
-
-/// Persistent, atomic rate-limit counter for unauthenticated guest AI usage.
-/// Stores an irreversible HMAC-SHA256 hash of the request IP (never the IP
-/// itself) plus a fixed time window and a request count — no prompts, no
-/// responses, no drafts. Backed by Neon so the limit holds across separate
-/// Vercel function instances/restarts, unlike an in-process counter.
-model GuestRateLimit {
-  id           String   @id @default(cuid())
-  ipHash       String
-  periodStart  DateTime
-  requestCount Int      @default(0)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-
-  @@unique([ipHash, periodStart])
-  @@index([periodStart])
 }

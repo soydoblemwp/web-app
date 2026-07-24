@@ -1,9 +1,11 @@
 "use client";
 
-import { useActionState, useEffect } from "react";
-import { generateGuestContentAdaptationAction } from "@/server/actions/guest";
+import { useState } from "react";
 import { socialPlatformValues } from "@/lib/validation/social";
+import { buildContentAdapterPrompt, buildContentAdapterSystemPrompt } from "@/lib/ai/prompts/guest";
 import { useGuestDrafts, GuestDraftsPanel } from "@/components/guest/guest-drafts-panel";
+import { useLocalAI } from "@/hooks/use-local-ai";
+import { LocalAIStatusPanel } from "@/components/ai/local-ai-status";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,17 +19,41 @@ import {
 } from "@/components/ui/select";
 
 export function GuestAdapterForm() {
-  const [state, formAction, isPending] = useActionState(generateGuestContentAdaptationAction, {});
+  const ai = useLocalAI();
   const { drafts, addDraft, removeDraft } = useGuestDrafts("adapter");
+  const [result, setResult] = useState<string | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
+  const busy = ai.status === "loading" || ai.status === "generating";
 
-  useEffect(() => {
-    if (state.text && state.title) addDraft(state.title, state.text);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.text]);
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setFormError(null);
+
+    const formData = new FormData(event.currentTarget);
+    const originalContent = String(formData.get("originalContent") ?? "").trim();
+    if (!originalContent) return setFormError("Pega el contenido original a adaptar.");
+    if (originalContent.length > 8000) return setFormError("El contenido original es demasiado largo.");
+
+    const targetPlatform = String(formData.get("targetPlatform") ?? "Instagram");
+
+    const system = buildContentAdapterSystemPrompt();
+    const prompt = buildContentAdapterPrompt({
+      originalContent,
+      targetPlatform,
+      tone: String(formData.get("tone") ?? "Igual que el original"),
+      language: String(formData.get("language") ?? "es").trim() || "es",
+    });
+
+    const text = await ai.generate({ system, prompt });
+    if (text) {
+      setResult(text);
+      addDraft(`Adaptado para ${targetPlatform}`, text);
+    }
+  }
 
   return (
     <div className="space-y-6">
-      <form action={formAction} className="space-y-4">
+      <form onSubmit={handleSubmit} className="space-y-4">
         <div className="space-y-2">
           <Label htmlFor="originalContent">Contenido original</Label>
           <Textarea
@@ -66,15 +92,16 @@ export function GuestAdapterForm() {
           </div>
         </div>
 
-        {state.error ? <p className="text-sm text-destructive">{state.error}</p> : null}
-        <Button type="submit" disabled={isPending}>
-          {isPending ? "Adaptando..." : "Adaptar contenido"}
+        {formError ? <p className="text-sm text-destructive">{formError}</p> : null}
+        <LocalAIStatusPanel ai={ai} />
+        <Button type="submit" disabled={busy}>
+          {busy ? "Adaptando..." : "Adaptar contenido"}
         </Button>
       </form>
 
-      {state.text ? (
+      {result ? (
         <div className="rounded-lg border bg-muted/30 p-4">
-          <p className="whitespace-pre-wrap text-sm">{state.text}</p>
+          <p className="whitespace-pre-wrap text-sm">{result}</p>
         </div>
       ) : null}
 

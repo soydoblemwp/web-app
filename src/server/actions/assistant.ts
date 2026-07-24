@@ -4,12 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db/prisma";
 import { requireProjectAccess } from "@/lib/permissions";
-import { generateAIContent } from "@/lib/ai/service";
-import { AIProviderError } from "@/lib/ai/types";
-import { buildBrandContext } from "@/lib/ai/brand-context";
-import { buildAssistantSystemPrompt } from "@/lib/ai/prompts/assistant";
-
-const MAX_HISTORY_MESSAGES = 20;
+import { LOCAL_MODEL_ID } from "@/lib/ai/local/model-config";
 
 export async function createConversationAction(projectId: string) {
   const user = await requireProjectAccess(projectId, "EDITOR");
@@ -19,64 +14,58 @@ export async function createConversationAction(projectId: string) {
   redirect(`/dashboard/${projectId}/assistant/${conversation.id}`);
 }
 
-export interface SendMessageFormState {
+export interface SaveAssistantExchangeInput {
+  projectId: string;
+  conversationId: string;
+  userMessage: string;
+  assistantMessage: string;
+}
+
+export interface SaveAssistantExchangeState {
   error?: string;
 }
 
-export async function sendMessageAction(
-  projectId: string,
-  conversationId: string,
-  _prevState: SendMessageFormState,
-  formData: FormData
-): Promise<SendMessageFormState> {
-  const user = await requireProjectAccess(projectId, "EDITOR");
+/**
+ * Persists a user/assistant message pair the browser already generated
+ * locally (see src/lib/ai/local). No AI runs here — this action only ever
+ * receives the final text, never a prompt, and never talks to any AI
+ * provider. Both messages are saved together, after generation succeeds, so
+ * a cancelled or failed generation never leaves an orphaned user message.
+ */
+export async function saveAssistantExchangeAction(
+  input: SaveAssistantExchangeInput
+): Promise<SaveAssistantExchangeState> {
+  const user = await requireProjectAccess(input.projectId, "EDITOR");
 
-  const text = String(formData.get("message") ?? "").trim();
-  if (!text) return { error: "Escribe un mensaje." };
-  if (text.length > 8000) return { error: "El mensaje es demasiado largo." };
+  if (!input.userMessage.trim()) return { error: "Escribe un mensaje." };
+  if (!input.assistantMessage.trim()) return { error: "No hay respuesta generada que guardar." };
 
-  const conversation = await prisma.aIConversation.findUnique({
-    where: { id: conversationId },
-    include: { messages: { orderBy: { createdAt: "asc" }, take: MAX_HISTORY_MESSAGES } },
-  });
-  if (!conversation || conversation.projectId !== projectId) {
+  const conversation = await prisma.aIConversation.findUnique({ where: { id: input.conversationId } });
+  if (!conversation || conversation.projectId !== input.projectId) {
     return { error: "Conversación no encontrada." };
-  }
-
-  const project = await prisma.project.findUniqueOrThrow({ where: { id: projectId } });
-  const brandKit = await prisma.brandKit.findUnique({ where: { projectId }, include: { terms: true } });
-  const system = buildAssistantSystemPrompt(buildBrandContext(project, brandKit));
-
-  await prisma.aIMessage.create({
-    data: { conversationId, role: "user", content: text },
-  });
-
-  let result;
-  try {
-    result = await generateAIContent({
-      projectId,
-      userId: user.id,
-      kind: "CHAT_MESSAGE",
-      system,
-      history: conversation.messages.map((m) => ({
-        role: m.role === "assistant" ? ("assistant" as const) : ("user" as const),
-        content: m.content,
-      })),
-      prompt: text,
-      skipCache: true,
-    });
-  } catch (error) {
-    return { error: error instanceof AIProviderError ? error.message : "No se pudo generar una respuesta." };
   }
 
   await prisma.$transaction([
     prisma.aIMessage.create({
-      data: { conversationId, role: "assistant", content: result.text },
+      data: { conversationId: input.conversationId, role: "user", content: input.userMessage },
     }),
-    prisma.aIConversation.update({ where: { id: conversationId }, data: { updatedAt: new Date() } }),
+    prisma.aIMessage.create({
+      data: { conversationId: input.conversationId, role: "assistant", content: input.assistantMessage },
+    }),
+    prisma.aIConversation.update({ where: { id: input.conversationId }, data: { updatedAt: new Date() } }),
   ]);
 
-  revalidatePath(`/dashboard/${projectId}/assistant/${conversationId}`);
+  await prisma.aIUsage.create({
+    data: {
+      projectId: input.projectId,
+      userId: user.id,
+      kind: "CHAT_MESSAGE",
+      provider: "local-browser",
+      model: LOCAL_MODEL_ID,
+    },
+  });
+
+  revalidatePath(`/dashboard/${input.projectId}/assistant/${input.conversationId}`);
   return {};
 }
 

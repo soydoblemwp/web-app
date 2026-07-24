@@ -1,7 +1,10 @@
 "use client";
 
-import { useActionState } from "react";
-import { generateReplyAction, type ReplyFormState } from "@/server/actions/reply";
+import { useState } from "react";
+import { buildReplyPrompt, buildReplySystemPrompt } from "@/lib/ai/prompts/reply";
+import { saveGeneratedReplyAction } from "@/server/actions/reply";
+import { useLocalAI } from "@/hooks/use-local-ai";
+import { LocalAIStatusPanel } from "@/components/ai/local-ai-status";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,14 +17,46 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-const initialState: ReplyFormState = {};
+export function GenerateReplyForm({
+  projectId,
+  brandContextText,
+}: {
+  projectId: string;
+  brandContextText: string;
+}) {
+  const ai = useLocalAI();
+  const [formError, setFormError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const busy = ai.status === "loading" || ai.status === "generating" || saving;
 
-export function GenerateReplyForm({ projectId }: { projectId: string }) {
-  const action = generateReplyAction.bind(null, projectId);
-  const [state, formAction, isPending] = useActionState(action, initialState);
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setFormError(null);
+
+    const formData = new FormData(event.currentTarget);
+    const context = String(formData.get("context") ?? "").trim();
+    if (!context) return setFormError("Pega el mensaje al que quieres responder.");
+    if (context.length > 4000) return setFormError("El mensaje es demasiado largo.");
+
+    const platform = String(formData.get("platform") ?? "General");
+    const replyType = String(formData.get("replyType") ?? "Comentario");
+    const tone = String(formData.get("tone") ?? "Cercano y profesional");
+    const language = String(formData.get("language") ?? "es");
+
+    const system = buildReplySystemPrompt(brandContextText);
+    const prompt = buildReplyPrompt({ context, replyType, platform, tone, language });
+
+    const text = await ai.generate({ system, prompt });
+    if (!text) return;
+
+    setSaving(true);
+    const result = await saveGeneratedReplyAction({ projectId, context, platform, body: text, language });
+    setSaving(false);
+    if (result?.error) setFormError(result.error);
+  }
 
   return (
-    <form action={formAction} className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-4">
       <div className="space-y-2">
         <Label htmlFor="context">Mensaje a responder</Label>
         <Textarea id="context" name="context" required rows={4} maxLength={4000} />
@@ -52,9 +87,10 @@ export function GenerateReplyForm({ projectId }: { projectId: string }) {
         </div>
       </div>
       <input type="hidden" name="language" value="es" />
-      {state.error ? <p className="text-sm text-destructive">{state.error}</p> : null}
-      <Button type="submit" disabled={isPending}>
-        {isPending ? "Generando..." : "Generar respuesta"}
+      {formError ? <p className="text-sm text-destructive">{formError}</p> : null}
+      <LocalAIStatusPanel ai={ai} />
+      <Button type="submit" disabled={busy}>
+        {saving ? "Guardando..." : busy ? "Generando..." : "Generar respuesta"}
       </Button>
       <p className="text-xs text-muted-foreground">
         La respuesta se guarda como borrador en la biblioteca de contenido. Nunca se envía automáticamente.
