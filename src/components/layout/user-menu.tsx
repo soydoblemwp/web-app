@@ -1,19 +1,16 @@
-"use client";
-
 import Link from "next/link";
 import { LogOut, Settings, ShieldCheck } from "lucide-react";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { logoutAction } from "@/server/actions/logout";
 
+/**
+ * Flat, always-visible header controls — deliberately not a dropdown menu.
+ * A previous DropdownMenu-based version crashed the page when opened, and
+ * it hid "Administración" behind an extra click besides. Every action here
+ * is its own directly clickable/tappable element; the identity block
+ * (avatar + name) is inert and never navigates.
+ */
 export function UserMenu({
   name,
   email,
@@ -26,48 +23,48 @@ export function UserMenu({
   const initials = (name || email).slice(0, 2).toUpperCase();
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger
+    <div className="flex items-center gap-1">
+      <div className="flex items-center gap-2 px-1">
+        <Avatar className="size-7">
+          <AvatarFallback className="text-xs">{initials}</AvatarFallback>
+        </Avatar>
+        <span className="hidden max-w-32 truncate text-sm md:inline">{name || email}</span>
+      </div>
+
+      <Button
+        variant="ghost"
+        size="sm"
+        aria-label="Mi cuenta"
+        className="gap-1.5"
         render={
-          <Button variant="ghost" className="gap-2 px-2">
-            <Avatar className="size-7">
-              <AvatarFallback className="text-xs">{initials}</AvatarFallback>
-            </Avatar>
-            <span className="hidden max-w-32 truncate text-sm md:inline">{name || email}</span>
-          </Button>
+          <Link href="/account">
+            <Settings className="size-4" />
+            <span className="hidden sm:inline">Mi cuenta</span>
+          </Link>
         }
       />
-      <DropdownMenuContent align="end" className="w-56">
-        <DropdownMenuLabel className="truncate">{email}</DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem
+
+      {isAdmin ? (
+        <Button
+          variant="outline"
+          size="sm"
+          aria-label="Administración"
+          className="gap-1.5"
           render={
-            <Link href="/account">
-              <Settings className="mr-2 size-4" /> Mi cuenta
+            <Link href="/admin">
+              <ShieldCheck className="size-4" />
+              <span className="hidden sm:inline">Administración</span>
             </Link>
           }
         />
-        {isAdmin ? (
-          <DropdownMenuItem
-            render={
-              <Link href="/admin">
-                <ShieldCheck className="mr-2 size-4" /> Panel administrativo
-              </Link>
-            }
-          />
-        ) : null}
-        <DropdownMenuSeparator />
-        <DropdownMenuItem
-          variant="destructive"
-          render={
-            <form action={logoutAction} className="w-full">
-              <button type="submit" className="flex w-full items-center">
-                <LogOut className="mr-2 size-4" /> Cerrar sesión
-              </button>
-            </form>
-          }
-        />
-      </DropdownMenuContent>
-    </DropdownMenu>
+      ) : null}
+
+      <form action={logoutAction}>
+        <Button type="submit" variant="ghost" size="sm" aria-label="Cerrar sesión" className="gap-1.5">
+          <LogOut className="size-4" />
+          <span className="hidden sm:inline">Cerrar sesión</span>
+        </Button>
+      </form>
+    </div>
   );
 }

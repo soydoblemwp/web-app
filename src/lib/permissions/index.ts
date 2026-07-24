@@ -2,6 +2,7 @@ import "server-only";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db/prisma";
 import type { GlobalRole, ProjectRole } from "@/generated/prisma/enums";
+import { ADMIN_ROLES } from "@/lib/permissions/roles";
 
 export class UnauthorizedError extends Error {
   constructor(message = "Debes iniciar sesión.") {
@@ -14,8 +15,6 @@ export class ForbiddenError extends Error {
     super(message);
   }
 }
-
-const ADMIN_ROLES: GlobalRole[] = ["ADMIN", "SUPER_ADMIN"];
 
 const PROJECT_ROLE_RANK: Record<ProjectRole, number> = {
   VIEWER: 0,

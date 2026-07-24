@@ -32,10 +32,10 @@ export default async function AdminUsersPage({
     include: { _count: { select: { workspaceMemberships: true, projectMemberships: true } } },
   });
 
-  const [totalUsers, totalProjects, aiUsageAgg] = await Promise.all([
+  const [totalUsers, activeUsers, totalProjects] = await Promise.all([
     prisma.user.count(),
+    prisma.user.count({ where: { isSuspended: false } }),
     prisma.project.count(),
-    prisma.aIUsage.aggregate({ _sum: { inputTokens: true, outputTokens: true }, _count: true }),
   ]);
 
   return (
@@ -49,16 +49,14 @@ export default async function AdminUsersPage({
         </Card>
         <Card>
           <CardContent className="py-4">
-            <p className="text-2xl font-semibold">{totalProjects}</p>
-            <p className="text-xs text-muted-foreground">Proyectos totales</p>
+            <p className="text-2xl font-semibold">{activeUsers}</p>
+            <p className="text-xs text-muted-foreground">Usuarios activos</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="py-4">
-            <p className="text-2xl font-semibold">{aiUsageAgg._count}</p>
-            <p className="text-xs text-muted-foreground">
-              Generaciones de IA · {(aiUsageAgg._sum.inputTokens ?? 0) + (aiUsageAgg._sum.outputTokens ?? 0)} tokens
-            </p>
+            <p className="text-2xl font-semibold">{totalProjects}</p>
+            <p className="text-xs text-muted-foreground">Proyectos totales</p>
           </CardContent>
         </Card>
       </div>

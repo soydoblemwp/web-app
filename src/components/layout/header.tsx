@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { appConfig } from "@/lib/config";
+import { isAdminRole } from "@/lib/permissions/roles";
 import { ProjectSwitcher } from "@/components/layout/project-switcher";
 import { UserMenu } from "@/components/layout/user-menu";
 import { NotificationsBell } from "@/components/layout/notifications-bell";
+import type { GlobalRole } from "@/generated/prisma/enums";
 
 export function Header({
   projects,
@@ -12,7 +14,7 @@ export function Header({
 }: {
   projects: { id: string; name: string }[];
   currentProjectId?: string;
-  user: { name: string | null; email: string; role: string };
+  user: { name: string | null; email: string; role: GlobalRole };
   unreadNotifications: number;
 }) {
   return (
@@ -23,7 +25,7 @@ export function Header({
       <div className="flex-1" />
       <ProjectSwitcher projects={projects} currentProjectId={currentProjectId} />
       <NotificationsBell unreadCount={unreadNotifications} />
-      <UserMenu name={user.name} email={user.email} isAdmin={user.role === "ADMIN" || user.role === "SUPER_ADMIN"} />
+      <UserMenu name={user.name} email={user.email} isAdmin={isAdminRole(user.role)} />
     </header>
   );
 }
