@@ -1,11 +1,42 @@
 /**
- * Prompt builders for guest-mode tools. No project or brand kit exists in
- * guest mode, so these use a fixed generic context instead of
- * `buildBrandContext` (which reads from a real Project/BrandKit row).
+ * Prompt builders for guest-mode tools. Guest projects and brand kits live
+ * in IndexedDB (src/lib/guest-storage/), never in Prisma — so this builds
+ * the brand-context block from that local shape instead of importing
+ * `buildBrandContext` (which is typed against the Prisma-generated models).
  */
 
+import type { LocalBrandKit } from "@/lib/guest-storage/types";
+
 export const GUEST_CONTEXT_NOTE =
-  "Modo invitado: no hay proyecto ni kit de marca asociado. Usa un tono neutro y profesional salvo que el usuario indique otro, y no inventes datos de marca.";
+  "Modo invitado: no hay cuenta asociada. Usa un tono neutro y profesional salvo que el proyecto local o el usuario indiquen otro, y no inventes datos de marca.";
+
+/** Renders a local (IndexedDB) project + brand kit into the same kind of block buildBrandContext produces for registered users. */
+export function buildLocalBrandContext(
+  project: { name: string; primaryLanguage: string; tone?: string; targetAudience?: string; market?: string },
+  brandKit: LocalBrandKit | null
+): string {
+  const lines: string[] = [`Proyecto: ${project.name}`, `Idioma principal: ${project.primaryLanguage}`];
+  if (project.targetAudience) lines.push(`Público objetivo del proyecto: ${project.targetAudience}`);
+  if (project.market) lines.push(`Mercado: ${project.market}`);
+  if (project.tone) lines.push(`Tono general del proyecto: ${project.tone}`);
+
+  if (brandKit?.isActiveForAI) {
+    if (brandKit.name) lines.push(`Nombre de marca: ${brandKit.name}`);
+    if (brandKit.tagline) lines.push(`Eslogan: ${brandKit.tagline}`);
+    if (brandKit.tone) lines.push(`Tono de marca: ${brandKit.tone}`);
+    if (brandKit.personality) lines.push(`Personalidad de marca: ${brandKit.personality}`);
+    if (brandKit.valueProposition) lines.push(`Propuesta de valor: ${brandKit.valueProposition}`);
+    if (brandKit.commonCTAs) lines.push(`CTA habituales: ${brandKit.commonCTAs}`);
+    if (brandKit.additionalNotes) lines.push(`Instrucciones adicionales: ${brandKit.additionalNotes}`);
+
+    const forbidden = brandKit.terms.filter((t) => t.isForbidden).map((t) => t.term);
+    const preferred = brandKit.terms.filter((t) => !t.isForbidden).map((t) => t.term);
+    if (preferred.length) lines.push(`Palabras preferidas: ${preferred.join(", ")}`);
+    if (forbidden.length) lines.push(`Palabras PROHIBIDAS (no usar bajo ninguna circunstancia): ${forbidden.join(", ")}`);
+  }
+
+  return [...lines, "", GUEST_CONTEXT_NOTE].join("\n");
+}
 
 export interface SocialIdeasInput {
   topic: string;

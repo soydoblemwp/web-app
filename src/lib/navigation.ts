@@ -26,6 +26,7 @@ import {
   Repeat,
   Bell,
   Download,
+  History,
 } from "lucide-react";
 
 export interface NavItem {
@@ -113,7 +114,7 @@ export interface GuestNavGroup {
 
 export const guestNavGroups: GuestNavGroup[] = [
   {
-    label: "Disponibles sin cuenta",
+    label: "Herramientas gratuitas",
     items: [
       { label: "Generador de contenido", href: "/guest/content", icon: FileText },
       { label: "Herramientas SEO", href: "/guest/seo", icon: Search },
@@ -124,22 +125,27 @@ export const guestNavGroups: GuestNavGroup[] = [
     ],
   },
   {
-    label: "Requieren una cuenta",
+    label: "Organización local",
     items: [
-      { label: "Proyectos permanentes", icon: FolderKanban, restricted: true },
-      { label: "Historial sincronizado", icon: LineChart, restricted: true },
-      { label: "Biblioteca permanente", icon: Library, restricted: true },
-      { label: "Campañas guardadas", icon: Megaphone, restricted: true },
-      { label: "Calendario permanente", icon: CalendarDays, restricted: true },
-      { label: "Automatizaciones", icon: Workflow, restricted: true },
-      { label: "Monitoreo", icon: Radar, restricted: true },
-      { label: "Integración WordPress", icon: Globe, restricted: true },
-      { label: "Integración GitHub", icon: GitBranch, restricted: true },
+      { label: "Proyectos", href: "/guest/projects", icon: FolderKanban },
+      { label: "Historial", href: "/guest/history", icon: History },
+      { label: "Biblioteca", href: "/guest/library", icon: Library },
+      { label: "Campañas", href: "/guest/campaigns", icon: Megaphone },
+      { label: "Calendario", href: "/guest/calendar", icon: CalendarDays },
+      { label: "Automatizaciones", href: "/guest/automations", icon: Workflow },
+      { label: "Monitoreo", href: "/guest/monitoring", icon: Radar },
+      { label: "Configuración de marca", href: "/guest/brand-kit", icon: Palette },
+      { label: "Exportar o eliminar datos", href: "/guest/export", icon: Download },
+    ],
+  },
+  {
+    label: "Cuenta e integraciones",
+    items: [
       { label: "Colaboraciones", icon: Handshake, restricted: true },
       { label: "Notificaciones persistentes", icon: Bell, restricted: true },
-      { label: "Configuración de marca", icon: Palette, restricted: true },
+      { label: "Integración WordPress", icon: Globe, restricted: true },
+      { label: "Integración GitHub", icon: GitBranch, restricted: true },
       { label: "Administración", icon: ShieldCheck, restricted: true },
-      { label: "Exportar o eliminar datos", icon: Download, restricted: true },
     ],
   },
 ];

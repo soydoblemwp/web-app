@@ -1,9 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { buildReplyPrompt, buildReplySystemPrompt } from "@/lib/ai/prompts/reply";
-import { GUEST_CONTEXT_NOTE } from "@/lib/ai/prompts/guest";
-import { useGuestDrafts, GuestDraftsPanel } from "@/components/guest/guest-drafts-panel";
+import { buildLocalBrandContext } from "@/lib/ai/prompts/guest";
+import { useGuestProject } from "@/hooks/use-guest-project";
+import { getLocalBrandKit } from "@/lib/guest-storage/brand-kit";
+import { saveLibraryItem } from "@/lib/guest-storage/library";
+import type { LocalBrandKit } from "@/lib/guest-storage/types";
+import { GuestProjectSelect } from "@/components/guest/guest-project-select";
+import { GuestLibraryPanel, useGuestSavedItems } from "@/components/guest/guest-library-panel";
 import { useLocalAI } from "@/hooks/use-local-ai";
 import { LocalAIStatusPanel } from "@/components/ai/local-ai-status";
 import { Button } from "@/components/ui/button";
@@ -20,10 +25,21 @@ import {
 
 export function GuestReplyForm() {
   const ai = useLocalAI();
-  const { drafts, addDraft, removeDraft } = useGuestDrafts("replies");
+  const { projects, selectedId, selectProject, refresh: refreshProjects, ensureProjectId } = useGuestProject();
+  const { items, refresh: refreshItems, removeItem } = useGuestSavedItems(selectedId, "REPLY");
+  const [brandKit, setBrandKit] = useState<LocalBrandKit | null>(null);
   const [result, setResult] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const busy = ai.status === "loading" || ai.status === "generating";
+
+  useEffect(() => {
+    ensureProjectId();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    (async () => setBrandKit(selectedId ? ((await getLocalBrandKit(selectedId)) ?? null) : null))();
+  }, [selectedId]);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -34,24 +50,41 @@ export function GuestReplyForm() {
     if (!context) return setFormError("Pega el mensaje al que quieres responder.");
     if (context.length > 4000) return setFormError("El mensaje es demasiado largo.");
 
-    const system = buildReplySystemPrompt(GUEST_CONTEXT_NOTE);
+    const language = String(formData.get("language") ?? "es").trim() || "es";
+    const project = projects.find((p) => p.id === selectedId);
+
+    const system = buildReplySystemPrompt(
+      buildLocalBrandContext(project ?? { name: "Invitado", primaryLanguage: language }, brandKit)
+    );
     const prompt = buildReplyPrompt({
       context,
       replyType: String(formData.get("replyType") ?? "Comentario positivo"),
       platform: String(formData.get("platform") ?? "Instagram"),
       tone: String(formData.get("tone") ?? "Cercano y profesional"),
-      language: String(formData.get("language") ?? "es").trim() || "es",
+      language,
     });
 
     const text = await ai.generate({ system, prompt });
-    if (text) {
-      setResult(text);
-      addDraft(`Respuesta: ${context.slice(0, 60)}`, text);
-    }
+    if (!text) return;
+
+    setResult(text);
+    const projectId = await ensureProjectId();
+    await saveLibraryItem({ projectId, kind: "REPLY", title: `Respuesta: ${context.slice(0, 60)}`, body: text });
+    await refreshItems();
   }
 
   return (
     <div className="space-y-6">
+      <GuestProjectSelect
+        projects={projects}
+        selectedId={selectedId}
+        onSelect={selectProject}
+        onCreated={async (p) => {
+          await refreshProjects();
+          selectProject(p.id);
+        }}
+      />
+
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="space-y-2">
           <Label htmlFor="context">Mensaje a responder</Label>
@@ -97,7 +130,7 @@ export function GuestReplyForm() {
         </div>
       ) : null}
 
-      <GuestDraftsPanel drafts={drafts} onDelete={removeDraft} />
+      <GuestLibraryPanel items={items} onDelete={removeItem} />
     </div>
   );
 }

@@ -11,7 +11,7 @@ import { AccountGateNavItem } from "@/components/guest/account-gate";
  * nav config itself, same as GuestNav does.
  */
 export function GuestRestrictedGrid() {
-  const restricted = guestNavGroups[1].items;
+  const restricted = guestNavGroups[2].items;
 
   return (
     <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">

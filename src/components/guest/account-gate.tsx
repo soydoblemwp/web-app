@@ -15,7 +15,7 @@ import {
 import { Button } from "@/components/ui/button";
 
 export const ACCOUNT_REQUIRED_MESSAGE =
-  "Esta función requiere una cuenta para guardar y sincronizar la información.";
+  "Esta función requiere una cuenta para proteger y sincronizar tus credenciales.";
 
 /**
  * The dialog shown whenever a guest touches a feature that needs an account.
@@ -39,8 +39,8 @@ export function AccountRequiredDialog({
           <DialogDescription>{ACCOUNT_REQUIRED_MESSAGE}</DialogDescription>
         </DialogHeader>
         <p className="text-sm text-muted-foreground">
-          Crea una cuenta gratuita o inicia sesión para guardar tu trabajo de forma permanente y acceder a esta
-          función.
+          Esta función guarda credenciales externas (contraseñas de aplicación, tokens de acceso) que solo pueden
+          protegerse de forma segura asociadas a una cuenta. Crea una cuenta gratuita o inicia sesión para acceder.
         </p>
         <DialogFooter>
           <Button variant="outline" render={<Link href="/login">Iniciar sesión</Link>} />

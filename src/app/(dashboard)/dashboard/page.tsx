@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { FolderKanban, Plus } from "lucide-react";
 import { getDashboardContext } from "@/server/services/dashboard-context";
 import { Header } from "@/components/layout/header";
+import { ImportLocalDataBanner } from "@/components/dashboard/import-local-data-banner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -15,6 +16,9 @@ export default async function ProjectsPage() {
     <div className="flex min-h-svh flex-col">
       <Header projects={projects} user={user} unreadNotifications={unreadNotifications} />
       <main className="mx-auto w-full max-w-5xl flex-1 px-6 py-8">
+        <div className="mb-6">
+          <ImportLocalDataBanner />
+        </div>
         <div className="mb-6 flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">Tus proyectos</h1>
