@@ -20,7 +20,12 @@ const STATUS_STYLES: Record<string, string> = {
   fail: "text-destructive",
 };
 
-export function GuestPostAnalyzerForm() {
+/**
+ * Deterministic, rule-based post analysis — no AI, no server round-trip,
+ * nothing to persist. Identical for guest and registered users, so this one
+ * component is shared by both instead of being duplicated per surface.
+ */
+export function PostAnalyzerForm() {
   const [platform, setPlatform] = useState("INSTAGRAM");
   const [result, setResult] = useState<PostAnalysisResult | null>(null);
 

@@ -10,7 +10,9 @@ const AI_FORM_FILES = [
   "src/components/guest/guest-adapter-form.tsx",
   "src/components/guest/guest-reply-form.tsx",
   "src/components/content/generate-content-form.tsx",
+  "src/components/content/content-adapter-form.tsx",
   "src/components/replies/generate-reply-form.tsx",
+  "src/components/social/generate-social-ideas-form.tsx",
   "src/components/assistant/chat-panel.tsx",
 ];
 

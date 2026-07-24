@@ -67,6 +67,88 @@ export async function saveGeneratedContentAction(
   redirect(`/dashboard/${input.projectId}/content/${contentItem.id}`);
 }
 
+export interface SaveGeneratedSocialIdeasInput {
+  projectId: string;
+  topic: string;
+  platform: string;
+  body: string;
+  language: string;
+}
+
+/** Same local-generation-then-save pattern as saveGeneratedContentAction, for the "Ideas para redes sociales" tool. */
+export async function saveGeneratedSocialIdeasAction(
+  input: SaveGeneratedSocialIdeasInput
+): Promise<SaveGeneratedContentState> {
+  const user = await requireProjectAccess(input.projectId, "EDITOR");
+
+  if (!input.topic.trim()) return { error: "Describe sobre qué quieres ideas." };
+  if (!input.body.trim()) return { error: "No hay ideas generadas que guardar." };
+
+  await prisma.contentItem.create({
+    data: {
+      projectId: input.projectId,
+      authorId: user.id,
+      type: "SOCIAL_TEXT",
+      title: `Ideas para ${input.platform}: ${input.topic}`.slice(0, 120),
+      body: input.body,
+      language: input.language,
+    },
+  });
+
+  await prisma.aIUsage.create({
+    data: {
+      projectId: input.projectId,
+      userId: user.id,
+      kind: "CONTENT_GENERATION",
+      provider: "local-browser",
+      model: LOCAL_MODEL_ID,
+    },
+  });
+
+  revalidatePath(`/dashboard/${input.projectId}/content`);
+  return {};
+}
+
+export interface SaveGeneratedContentAdaptationInput {
+  projectId: string;
+  targetPlatform: string;
+  body: string;
+  language: string;
+}
+
+/** Same local-generation-then-save pattern as saveGeneratedContentAction, for the "Adaptador de contenido" tool. */
+export async function saveGeneratedContentAdaptationAction(
+  input: SaveGeneratedContentAdaptationInput
+): Promise<SaveGeneratedContentState> {
+  const user = await requireProjectAccess(input.projectId, "EDITOR");
+
+  if (!input.body.trim()) return { error: "No hay contenido adaptado que guardar." };
+
+  await prisma.contentItem.create({
+    data: {
+      projectId: input.projectId,
+      authorId: user.id,
+      type: "OTHER",
+      title: `Adaptado para ${input.targetPlatform}`.slice(0, 120),
+      body: input.body,
+      language: input.language,
+    },
+  });
+
+  await prisma.aIUsage.create({
+    data: {
+      projectId: input.projectId,
+      userId: user.id,
+      kind: "ADAPTATION",
+      provider: "local-browser",
+      model: LOCAL_MODEL_ID,
+    },
+  });
+
+  revalidatePath(`/dashboard/${input.projectId}/content`);
+  return {};
+}
+
 export async function updateContentItemAction(projectId: string, formData: FormData) {
   const user = await requireProjectAccess(projectId, "EDITOR");
 

@@ -52,6 +52,7 @@ export const projectNavGroups: NavGroup[] = [
     label: "Creación",
     items: [
       { label: "Contenido", segment: "content", icon: FileText },
+      { label: "Adaptador de contenido", segment: "content/adapt", icon: Repeat },
       { label: "SEO", segment: "seo", icon: Search },
       { label: "Biblioteca", segment: "library", icon: Library },
     ],
@@ -60,6 +61,8 @@ export const projectNavGroups: NavGroup[] = [
     label: "Redes sociales",
     items: [
       { label: "Publicaciones", segment: "social", icon: Share2 },
+      { label: "Ideas para redes sociales", segment: "social/ideas", icon: Sparkles },
+      { label: "Analizador de publicaciones", segment: "social/analyzer", icon: ClipboardCheck },
       { label: "Calendario", segment: "calendar", icon: CalendarDays },
       { label: "Campañas", segment: "campaigns", icon: Megaphone },
       { label: "Respuestas", segment: "replies", icon: MessageSquareReply },

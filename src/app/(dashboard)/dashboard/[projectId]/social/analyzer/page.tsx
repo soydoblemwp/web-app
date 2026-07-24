@@ -1,10 +1,9 @@
 import type { Metadata } from "next";
-import { GuestModeBanner } from "@/components/guest/guest-mode-banner";
 import { PostAnalyzerForm } from "@/components/content/post-analyzer-form";
 
-export const metadata: Metadata = { title: "Analizador de publicaciones (invitado)" };
+export const metadata: Metadata = { title: "Analizador de publicaciones" };
 
-export default function GuestAnalyzerPage() {
+export default function SocialAnalyzerPage() {
   return (
     <div className="max-w-2xl space-y-6">
       <div>
@@ -14,7 +13,6 @@ export default function GuestAnalyzerPage() {
           antes de publicar.
         </p>
       </div>
-      <GuestModeBanner />
       <PostAnalyzerForm />
     </div>
   );

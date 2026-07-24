@@ -46,14 +46,19 @@ export interface SocialIdeasInput {
   count: number;
 }
 
-export function buildSocialIdeasSystemPrompt(): string {
+/**
+ * `context` defaults to the generic guest note; registered-user callers pass
+ * their real brand context (from buildBrandContext or buildLocalBrandContext)
+ * instead — same function, no duplicated prompt logic.
+ */
+export function buildSocialIdeasSystemPrompt(context: string = GUEST_CONTEXT_NOTE): string {
   return [
     "Eres el generador de ideas para redes sociales de AI Content Hub.",
     "Genera ideas variadas, concretas y accionables — nunca genéricas o repetitivas entre sí.",
     "No inventes datos, cifras ni tendencias que no se puedan verificar.",
     "Devuelve únicamente una lista numerada de ideas, una por línea, sin explicaciones adicionales.",
     "",
-    GUEST_CONTEXT_NOTE,
+    context,
   ].join("\n");
 }
 
@@ -72,7 +77,8 @@ export interface ContentAdapterInput {
   language: string;
 }
 
-export function buildContentAdapterSystemPrompt(): string {
+/** Same defaulting rule as buildSocialIdeasSystemPrompt above. */
+export function buildContentAdapterSystemPrompt(context: string = GUEST_CONTEXT_NOTE): string {
   return [
     "Eres el adaptador de contenido de AI Content Hub.",
     "Transformas una pieza de contenido existente al formato y estilo típico de la plataforma de destino indicada,",
@@ -80,7 +86,7 @@ export function buildContentAdapterSystemPrompt(): string {
     "Nunca sobrescribas ni pretendas ser el contenido original — genera únicamente la versión adaptada.",
     "Devuelve solo el texto adaptado, sin explicaciones adicionales.",
     "",
-    GUEST_CONTEXT_NOTE,
+    context,
   ].join("\n");
 }
 
