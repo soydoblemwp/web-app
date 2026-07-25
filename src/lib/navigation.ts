@@ -27,6 +27,13 @@ import {
   Bell,
   Download,
   History,
+  LayoutGrid,
+  Layers,
+  MessageCircle,
+  BookMarked,
+  LayoutTemplate,
+  Fingerprint,
+  Waypoints,
 } from "lucide-react";
 
 export interface NavItem {
@@ -45,6 +52,13 @@ export const projectNavGroups: NavGroup[] = [
     label: "Principal",
     items: [
       { label: "Dashboard", segment: "", icon: LayoutDashboard },
+      { label: "Chat IA", segment: "chat", icon: MessageCircle },
+      { label: "AI Center", segment: "ai-center", icon: LayoutGrid },
+      { label: "Workspace IA", segment: "workspace", icon: Layers },
+      { label: "Prompt Library", segment: "prompt-library", icon: BookMarked },
+      { label: "AI Templates", segment: "ai-templates", icon: LayoutTemplate },
+      { label: "Brand Kits", segment: "brand-kits", icon: Fingerprint },
+      { label: "AI Workflows", segment: "ai-workflows", icon: Waypoints },
       { label: "Asistente IA", segment: "assistant", icon: Bot },
     ],
   },

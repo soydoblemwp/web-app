@@ -39,6 +39,7 @@ export async function saveGeneratedReplyAction(
       title: `Respuesta (${input.platform}): ${input.context.slice(0, 60)}`,
       body: input.body,
       language: input.language,
+      sourceTool: "generador-respuestas",
     },
   });
 

@@ -13,7 +13,9 @@ const AI_FORM_FILES = [
   "src/components/content/content-adapter-form.tsx",
   "src/components/replies/generate-reply-form.tsx",
   "src/components/social/generate-social-ideas-form.tsx",
+  "src/components/ai-center/generation/ai-generation-form.tsx",
   "src/components/assistant/chat-panel.tsx",
+  "src/components/chat/chat-panel.tsx",
 ];
 
 const FORBIDDEN_IMPORTS = [
@@ -41,6 +43,7 @@ describe("every AI-generating form uses the local browser engine", () => {
       "src/server/actions/content.ts",
       "src/server/actions/reply.ts",
       "src/server/actions/assistant.ts",
+      "src/server/actions/ai-center-tools.ts",
     ];
     for (const relativePath of actionFiles) {
       const content = readFileSync(path.join(ROOT, relativePath), "utf8");

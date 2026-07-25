@@ -3,6 +3,7 @@ import { UserPlus } from "lucide-react";
 import { appConfig } from "@/lib/config";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ThemeToggle } from "@/components/layout/theme-toggle";
 
 /**
  * Header for the whole guest experience — always shows the "Modo invitado"
@@ -20,6 +21,7 @@ export function GuestHeader() {
         Modo invitado
       </Badge>
       <div className="flex-1" />
+      <ThemeToggle />
       <Button variant="ghost" size="sm" render={<Link href="/login">Iniciar sesión</Link>} />
       <Button size="sm" render={
         <Link href="/register">

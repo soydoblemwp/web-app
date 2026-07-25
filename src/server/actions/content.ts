@@ -50,6 +50,7 @@ export async function saveGeneratedContentAction(
       tone: input.tone || null,
       keywords: input.keywords ? input.keywords.split(",").map((k) => k.trim()).filter(Boolean) : [],
       cta: input.cta || null,
+      sourceTool: "generador-contenido",
     },
   });
 
@@ -92,6 +93,7 @@ export async function saveGeneratedSocialIdeasAction(
       title: `Ideas para ${input.platform}: ${input.topic}`.slice(0, 120),
       body: input.body,
       language: input.language,
+      sourceTool: "ideas-redes-sociales",
     },
   });
 
@@ -132,6 +134,7 @@ export async function saveGeneratedContentAdaptationAction(
       title: `Adaptado para ${input.targetPlatform}`.slice(0, 120),
       body: input.body,
       language: input.language,
+      sourceTool: "adaptador-contenido",
     },
   });
 

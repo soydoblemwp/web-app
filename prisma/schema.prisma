@@ -193,6 +193,11 @@ enum AIResultKind {
   SEO_SUGGESTION
 }
 
+enum AiToolInteractionType {
+  FAVORITE
+  RECENT_USE
+}
+
 enum NotificationType {
   POST_DUE
   UPCOMING_DATE
@@ -243,17 +248,24 @@ model User {
   sessions             Session[]
   workspaceMemberships WorkspaceMember[]
   projectMemberships   ProjectMember[]
-  ownedWorkspaces      Workspace[]       @relation("WorkspaceOwner")
-  contentItems         ContentItem[]     @relation("ContentAuthor")
-  contentVersions      ContentVersion[]  @relation("ContentVersionAuthor")
-  socialPosts          SocialPost[]      @relation("SocialPostAuthor")
-  campaigns            Campaign[]        @relation("CampaignOwner")
-  collaborations       Collaboration[]   @relation("CollaborationOwner")
+  ownedWorkspaces      Workspace[]         @relation("WorkspaceOwner")
+  contentItems         ContentItem[]       @relation("ContentAuthor")
+  contentVersions      ContentVersion[]    @relation("ContentVersionAuthor")
+  socialPosts          SocialPost[]        @relation("SocialPostAuthor")
+  campaigns            Campaign[]          @relation("CampaignOwner")
+  collaborations       Collaboration[]     @relation("CollaborationOwner")
   aiConversations      AIConversation[]
   aiUsageEvents        AIUsage[]
+  aiToolInteractions   AiToolInteraction[]
   notifications        Notification[]
   auditLogs            AuditLog[]
   fileAssets           FileAsset[]
+  savedPrompts         SavedPrompt[]
+  aiTemplates          AiTemplate[]
+  brandProfiles        BrandProfile[]
+  workflows            Workflow[]
+  workflowRuns         WorkflowRun[]
+  workflowRevisions    WorkflowRevision[]
 
   @@index([email])
 }
@@ -372,9 +384,15 @@ model Project {
   githubConnection    GitHubConnection?
   aiConversations     AIConversation[]
   aiUsageEvents       AIUsage[]
+  aiToolInteractions  AiToolInteraction[]
   notifications       Notification[]
   fileAssets          FileAsset[]
   seoAnalyses         SeoAnalysis[]
+  savedPrompts        SavedPrompt[]
+  aiTemplates         AiTemplate[]
+  workflows           Workflow[]
+  workflowRuns        WorkflowRun[]
+  workflowRevisions   WorkflowRevision[]
 
   @@index([workspaceId])
   @@index([ownerId])
@@ -484,6 +502,10 @@ model ContentItem {
   isArchived      Boolean       @default(false)
   deletedAt       DateTime?
   sourceContentId String?
+  /// Slug of the AI Center tool that generated this item (e.g. "youtube-titulos"), when known.
+  /// Powers the universal AI workspace's tool/category labels and search — null for older
+  /// rows or content created outside a registered tool.
+  sourceTool      String?
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
 
@@ -960,25 +982,455 @@ model AIMessage {
 }
 
 model AIUsage {
-  id           String       @id @default(cuid())
-  projectId    String
-  userId       String
-  kind         AIResultKind
-  provider     String
-  model        String
-  inputTokens  Int          @default(0)
-  outputTokens Int          @default(0)
-  latencyMs    Int?
-  wasCached    Boolean      @default(false)
-  wasError     Boolean      @default(false)
-  errorMessage String?
-  createdAt    DateTime     @default(now())
+  id                String       @id @default(cuid())
+  projectId         String
+  userId            String
+  kind              AIResultKind
+  provider          String
+  model             String
+  inputTokens       Int          @default(0)
+  outputTokens      Int          @default(0)
+  latencyMs         Int?
+  wasCached         Boolean      @default(false)
+  wasError          Boolean      @default(false)
+  errorMessage      String?
+  /// AI Workflows correlation (analytics phase) — all nullable so every pre-existing row, and every non-Workflow generation (still the majority of rows), stays valid untouched. Populated only for a REAL Workflow execution's "ai_tool" step — never for the simulated preview, which creates no AIUsage row at all.
+  workflowId        String?
+  workflowRunId     String?
+  workflowStepRunId String?
+  /// The Workflow version this usage event ran under — copied from WorkflowRun.workflowVersion at the moment of the real AI call, so a later Workflow edit never rewrites historical usage attribution.
+  workflowVersion   Int?
+  /// AiToolDefinition.slug (see src/lib/ai-center/tools/registry.ts) when this step was an "ai_tool" step — null for every other step type, which never calls the model.
+  toolSlug          String?
+  /// Mirrors WorkflowRun.executionMode at the time of the call ("NEW" | "RETRY_ORIGINAL_SNAPSHOT" | "RETRY_CURRENT_VERSION") — purely descriptive.
+  executionMode     String?
+  createdAt         DateTime     @default(now())
 
-  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project         Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workflow        Workflow?        @relation(fields: [workflowId], references: [id], onDelete: SetNull)
+  workflowRun     WorkflowRun?     @relation(fields: [workflowRunId], references: [id], onDelete: SetNull)
+  workflowStepRun WorkflowStepRun? @relation(fields: [workflowStepRunId], references: [id], onDelete: SetNull)
 
   @@index([projectId, createdAt])
   @@index([userId, createdAt])
+  @@index([workflowId, createdAt])
+  @@index([workflowRunId])
+}
+
+// ---------------------------------------------------------------------------
+// AI Center — favorites & recently-used tools (registry itself lives in code,
+// see src/lib/ai-center/registry.ts; this only stores per-user preferences)
+// ---------------------------------------------------------------------------
+
+model AiToolInteraction {
+  id        String                @id @default(cuid())
+  userId    String
+  projectId String?
+  toolSlug  String
+  type      AiToolInteractionType
+  createdAt DateTime              @default(now())
+  updatedAt DateTime              @updatedAt
+
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, toolSlug, type])
+  @@index([userId, type])
+}
+
+// ---------------------------------------------------------------------------
+// Prompt Library — a personal, reusable library of prompts, global to a user
+// (projectId null) or scoped to one of their projects. Independent of
+// ContentItem/Workspace: this stores reusable prompt TEXT the user wrote or
+// saved from a tool, not generated output.
+// ---------------------------------------------------------------------------
+
+model SavedPrompt {
+  id          String    @id @default(cuid())
+  userId      String
+  projectId   String?
+  title       String
+  description String?
+  content     String    @db.Text
+  category    String?
+  tags        String[]  @default([])
+  isFavorite  Boolean   @default(false)
+  /// Slug of the AI Center tool this prompt was saved from (e.g. "youtube-titulos"), when known.
+  sourceTool  String?
+  useCount    Int       @default(0)
+  lastUsedAt  DateTime?
+  /// When true, "Usar" composes this prompt's content together with the user's default BrandProfile context — see src/lib/brand-profiles/context.ts.
+  useBrandKit Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([userId, updatedAt])
+  @@index([userId, isFavorite])
+  @@index([projectId])
+}
+
+// ---------------------------------------------------------------------------
+// AI Templates — reusable STRUCTURE with {{variable}} placeholders, global to
+// a user (projectId null) or scoped to one of their projects. Distinct from
+// SavedPrompt (Prompt Library): a prompt stores instructions, a template
+// stores a fillable structure — see src/lib/ai-templates/engine.ts for the
+// variable-detection/render engine. `variables` is always derived
+// server-side from `content`, never trusted from the client.
+// ---------------------------------------------------------------------------
+
+model AiTemplate {
+  id          String   @id @default(cuid())
+  userId      String
+  projectId   String?
+  title       String
+  description String?
+  content     String   @db.Text
+  variables   String[] @default([])
+  category    String?
+  tags        String[] @default([])
+  isFavorite  Boolean  @default(false)
+  /// Slug of the AI Center tool this template was saved from (e.g. "youtube-titulos"), when known.
+  sourceTool  String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([userId, updatedAt])
+  @@index([userId, isFavorite])
+  @@index([projectId])
+}
+
+// ---------------------------------------------------------------------------
+// Brand Kit (multi-profile) — distinct from the existing per-project BrandKit
+// model above (src/components/brand-kit, the single "Kit de marca" settings
+// page), which is untouched by this phase. A BrandProfile is a reusable,
+// user-owned brand identity a person can create several of and pick between
+// across every project — see src/lib/brand-profiles/context.ts for how it
+// becomes AI context/template variables.
+// ---------------------------------------------------------------------------
+
+model BrandProfile {
+  id              String   @id @default(cuid())
+  userId          String
+  name            String
+  description     String?
+  mission         String?
+  vision          String?
+  values          String[] @default([])
+  targetAudience  String?
+  tone            String?
+  personality     String?
+  primaryLanguage String?
+  country         String?
+  allowedWords    String[] @default([])
+  forbiddenWords  String[] @default([])
+  writingStyle    String?
+  preferredCTAs   String[] @default([])
+  socialLinks     String[] @default([])
+  website         String?
+  email           String?
+  colors          String[] @default([])
+  typography      String?
+  /// Reference only (e.g. a URL) — no image upload/processing happens in this app.
+  logoUrl         String?
+  internalNotes   String?
+  isDefault       Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, updatedAt])
+  @@index([userId, isDefault])
+}
+
+// ---------------------------------------------------------------------------
+// AI Workflows — reusable, ordered sequences of steps (each step runs an
+// existing tool/prompt/template/brand-kit/transform by reference), global to
+// a user (projectId null) or scoped to one of their projects. `steps` is a
+// JSON array (see src/lib/ai-workflows/engine.ts for its shape and the pure
+// validation/planning engine); no separate step table is needed since steps
+// are never queried independently of their workflow. `variables` is always
+// derived server-side from `steps`, never trusted from the client, same
+// convention as AiTemplate.variables.
+// ---------------------------------------------------------------------------
+
+/// The Workflow's coarse lifecycle stage. DRAFT: never published. PUBLISHED:
+/// has at least one active WorkflowRevision (the draft may still have
+/// unpublished changes on top — see hasUnpublishedChanges, a separate flag,
+/// precisely so this enum never has to represent "both at once"). ARCHIVED:
+/// frozen — no new executions, no publishing, until explicitly restored;
+/// history/revisions/runs/analytics all survive untouched.
+enum WorkflowLifecycleStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+model Workflow {
+  id          String   @id @default(cuid())
+  userId      String
+  projectId   String?
+  name        String
+  description String?
+  category    String?
+  tags        String[] @default([])
+  isFavorite  Boolean  @default(false)
+  isActive    Boolean  @default(true)
+  /// The current DRAFT's steps — editable, never itself "the production version". A real, stable execution reads from the active WorkflowRevision's own frozen definitionSnapshot instead, never from these live columns.
+  steps       Json
+  variables   String[] @default([])
+  /// Legacy/frozen — no longer auto-incremented on every edit (see haveWorkflowStepsChanged's prior role in updateWorkflowAction, now removed). Kept only so pre-existing WorkflowRun.workflowVersion values already recorded under the old single-stage model stay meaningful. publishedVersion is the authoritative version number going forward.
+  version     Int      @default(1)
+
+  status                WorkflowLifecycleStatus @default(DRAFT)
+  /// The version number of the currently active, published WorkflowRevision — null until the first successful publish. A workflow with no publishedVersion cannot start a normal ("published") execution.
+  publishedVersion      Int?
+  /// FK to the single WorkflowRevision currently marked isActive — the one real executions read from. Transactionally kept in sync with publishing: exactly one revision is active at a time.
+  activeRevisionId      String?                 @unique
+  /// Canonical hash of the current draft (name/description/category/tags/steps/variables/stopOnError) — recomputed server-side on every draft save, never trusted from the client. See src/lib/ai-workflows/definition-hash.ts.
+  draftHash             String?
+  /// Copy of the active revision's own definitionHash at publish time — compared against draftHash to derive hasUnpublishedChanges cheaply, without re-fetching/re-hashing the revision on every read.
+  publishedHash         String?
+  /// Optimistic-concurrency token for draft saves — the client must send back the editVersion it last read; a mismatch means someone else (another tab) saved first, and the write is rejected rather than silently overwritten. Bumped by exactly 1 on every successful draft save.
+  editVersion           Int                     @default(1)
+  /// Cheap, server-maintained mirror of (draftHash !== publishedHash) — recomputed on every draft save and every publish, so listings never need to hash on read.
+  hasUnpublishedChanges Boolean                 @default(false)
+  lastPublishedAt       DateTime?
+  archivedAt            DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user            User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project         Project?             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  runs            WorkflowRun[]
+  aiUsageEvents   AIUsage[]
+  revisions       WorkflowRevision[]   @relation("WorkflowRevisions")
+  activeRevision  WorkflowRevision?    @relation("WorkflowActiveRevision", fields: [activeRevisionId], references: [id], onDelete: SetNull)
+  /// Edges where THIS workflow is the parent (it USES childWorkflowId as a SubWorkflow) — recomputed wholesale on every publish from the newly-active revision's own "workflow" steps. See src/server/services/workflow-lifecycle.ts.
+  usesWorkflows   WorkflowDependency[] @relation("WorkflowDependencyParent")
+  /// Edges where THIS workflow is the child (some other published workflow USES it as a SubWorkflow) — "quién depende de mí", read before archiving.
+  usedByWorkflows WorkflowDependency[] @relation("WorkflowDependencyChild")
+
+  @@index([userId, updatedAt])
+  @@index([userId, isFavorite])
+  @@index([projectId])
+  @@index([userId, status])
+}
+
+/// One directed edge "workflowId USES childWorkflowId as a SubWorkflow" —
+/// an indexed, queryable mirror of what the published definition's
+/// "workflow"-type steps reference, so "who do I depend on" / "who depends
+/// on me" and publish-time cycle detection never need to JSON-scan every
+/// workflow's steps. Wholesale-recomputed (delete all where workflowId =
+/// X, then re-insert) inside the SAME transaction as every publish — always
+/// reflects the newly-active PUBLISHED revision, never the draft. See
+/// src/lib/ai-workflows/workflow-graph.ts for the pure cycle-detection
+/// algorithm that consumes this edge list.
+model WorkflowDependency {
+  id              String   @id @default(cuid())
+  workflowId      String
+  childWorkflowId String
+  userId          String
+  projectId       String
+  createdAt       DateTime @default(now())
+
+  workflow      Workflow @relation("WorkflowDependencyParent", fields: [workflowId], references: [id], onDelete: Cascade)
+  childWorkflow Workflow @relation("WorkflowDependencyChild", fields: [childWorkflowId], references: [id], onDelete: Cascade)
+
+  @@unique([workflowId, childWorkflowId])
+  @@index([workflowId])
+  @@index([childWorkflowId])
+}
+
+/// An immutable, point-in-time copy of a Workflow's definition, created ONLY
+/// by an explicit "Publicar versión" action — never edited afterward. Real
+/// ("published") executions always read from the currently-active one
+/// (Workflow.activeRevisionId); older revisions stay fully readable forever
+/// for history, comparison, and rollback, even after a newer one supersedes
+/// them. See src/lib/ai-workflows/definition-hash.ts for how definitionHash
+/// is computed, and src/server/services/workflow-lifecycle.ts for how
+/// publishing keeps "exactly one active revision" true transactionally.
+model WorkflowRevision {
+  id                 String    @id @default(cuid())
+  workflowId         String
+  userId             String
+  projectId          String
+  /// Matches Workflow.publishedVersion at the moment this revision became active — monotonically increasing per workflow, never reused (rollback creates a NEW higher version, never reverts the counter).
+  version            Int
+  /// Frozen copy of {name, description, category, tags, steps, variables, stopOnError, workflowVersion} at publish time — see CanonicalWorkflowDefinition. Never mutated after creation.
+  definitionSnapshot Json
+  /// Canonical hash of definitionSnapshot's executable content — see src/lib/ai-workflows/definition-hash.ts. Used to reject a publish that would produce no real change.
+  definitionHash     String
+  /// Deterministic, structurally-derived summary of what changed vs the previous active revision (step counts added/removed/moved, tool/prompt/template/brand-kit changes, variable deltas, stopOnError toggle, metadata edits) — see src/lib/ai-workflows/workflow-diff.ts. Never required to come from an LLM.
+  changeSummary      Json?
+  /// Optional free-text note the publisher can attach ("motivo del cambio") — user-authored, never auto-generated.
+  releaseNotes       String?   @db.Text
+  /// True for exactly one revision per workflow at a time — the one real executions and the UI's "versión publicada activa" read from.
+  isActive           Boolean   @default(false)
+  createdAt          DateTime  @default(now())
+  publishedAt        DateTime?
+  /// Set (alongside every sibling revision of the same workflow) when the parent Workflow is archived — informational only, never destructive; restoring the workflow does not need to clear it.
+  archivedAt         DateTime?
+
+  workflow          Workflow      @relation("WorkflowRevisions", fields: [workflowId], references: [id], onDelete: Cascade)
+  user              User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project           Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  activeForWorkflow Workflow?     @relation("WorkflowActiveRevision")
+  runs              WorkflowRun[]
+
+  @@unique([workflowId, version])
+  @@index([workflowId, isActive])
+  @@index([workflowId, createdAt])
+}
+
+// ---------------------------------------------------------------------------
+// AI Workflows — real execution (Phase 21). A WorkflowRun is one real,
+// server-orchestrated pass through a Workflow's steps — distinct from the
+// client-only, never-persisted simulated plan (planWorkflowRun in
+// src/lib/ai-workflows/engine.ts), which stays exactly as it was. Every
+// real "ai_tool" step still runs the model in the browser (see
+// src/lib/ai/local/engine.ts — "client-only", the single existing engine,
+// never duplicated); this table only ever records server-verified state
+// and results, never trusting client-reported ones. See
+// src/server/services/workflow-execution.ts for the state machine.
+// ---------------------------------------------------------------------------
+
+enum WorkflowRunStatus {
+  PENDING
+  VALIDATING
+  RUNNING
+  /// Detected (never cron-fired) when a RUNNING run's lease expired with no heartbeat — set the moment a client next looks (page open, history view, or a resume attempt). Recoverable via the explicit "Reanudar ejecución" action; never auto-resumed.
+  INTERRUPTED
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum WorkflowStepRunStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+  SKIPPED
+  CANCELLED
+}
+
+model WorkflowRun {
+  id                   String            @id @default(cuid())
+  workflowId           String
+  userId               String
+  projectId            String
+  status               WorkflowRunStatus @default(PENDING)
+  /// Client-generated, server-enforced-unique per user — a retried double-click with the same key resolves to this same run instead of creating a duplicate.
+  idempotencyKey       String
+  stopOnError          Boolean           @default(true)
+  inputVariables       Json
+  finalOutput          String?           @db.Text
+  errorMessage         String?           @db.Text
+  startedAt            DateTime?
+  completedAt          DateTime?
+  cancelledAt          DateTime?
+  /// The Workflow's version this run was started against — always taken from workflowSnapshot, never re-derived from the (possibly since-edited) live Workflow.
+  workflowVersion      Int               @default(1)
+  /// Immutable, server-built copy of the exact Workflow definition (name/description/category/variables/stopOnError/steps) plus every referenced resource's frozen content (Prompt Library text, AI Template content+variables, Brand Kit context, the project/profile brand context for ai_tool steps) at the moment this run started. Every step of this run is executed against THIS, never against the live, possibly-since-edited Workflow/resources. Null only for runs created before this field existed (Phase 21) — those keep falling back to a live lookup for backward compatibility.
+  workflowSnapshot     Json?
+  /// Set each time an interrupted/abandoned run is explicitly resumed — null for a run that has never been resumed.
+  resumedAt            DateTime?
+  /// Human-readable, honest reason this run was marked INTERRUPTED (e.g. lease expired) — never claims a stronger guarantee (like "detected in the background") than what actually happened (detected lazily, on next access).
+  interruptionReason   String?           @db.Text
+  /// Opaque, server-minted token identifying the current lease holder — every prepare/complete/fail/heartbeat/cancel call for this run must present the exact value back, or it's rejected. Never client-chosen.
+  leaseId              String?
+  /// Opaque, client-generated per-tab identifier — purely descriptive (used for "otra pestaña" UI messaging and to let a tab recognize its own prior lease after a same-tab reload); never trusted for authorization, which leaseId + the existing ownership checks alone provide.
+  leaseOwner           String?
+  leaseAcquiredAt      DateTime?
+  leaseExpiresAt       DateTime?
+  lastHeartbeatAt      DateTime?
+  /// Set only on a run created by "Reintentar ejecución" — points at the run it retried, so history stays traceable without ever overwriting the original.
+  retryOfRunId         String?
+  /// "PUBLISHED" (normal real execution, active revision) | "DRAFT_TEST" ("Probar borrador") | "RETRY_ORIGINAL_SNAPSHOT" | "RETRY_CURRENT_VERSION" (always the current PUBLISHED revision, never the draft) | legacy "NEW" on pre-lifecycle rows — how this run came to exist; purely descriptive/traceability, not itself an authorization check.
+  executionMode        String            @default("PUBLISHED")
+  /// completedAt - startedAt in milliseconds, stored once the run reaches a terminal status — avoids recomputing/reading full rows just to build a duration histogram.
+  durationMs           Int?
+  /// Stable classification of errorMessage (see src/lib/ai-workflows/error-normalization.ts) — e.g. "tool_not_found", "lease_expired" — never the raw message, so error analytics can group safely without re-parsing free text.
+  normalizedErrorCode  String?
+  /// The active WorkflowRevision this run executed against, when executionMode is a "published" kind — null for draft_test runs (which have no revision, only a snapshot of the draft) and for runs created before this phase.
+  workflowRevisionId   String?
+  /// Copy of the source definition's own hash (the revision's definitionHash, or the draft's own draftHash for a draft_test run) at the moment this run started — lets integrity be verified later without re-hashing workflowSnapshot.
+  sourceDefinitionHash String?
+  /// Set only when this run was started BY a "workflow" step of another run (a SubWorkflow) — the parent WorkflowRun.id. Null for every top-level, user-initiated run. Indexed so "children of this run" is a direct query, never a JSON scan.
+  parentRunId          String?
+  /// The exact WorkflowStepRun (on the PARENT run) whose "workflow" step spawned this run — unique, since one step spawns at most one child run per attempt. Lets Workspace/analytics jump straight from a child run back to the precise parent step, not just the parent run.
+  parentStepRunId      String?           @unique
+  /// 0 for a top-level run; parentRun.depth + 1 for a SubWorkflow run — server-computed and enforced against MAX_WORKFLOW_NESTING_DEPTH (see src/lib/ai-workflows/limits.ts) at child-run-creation time, never trusted from anywhere else.
+  depth                Int               @default(0)
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
+
+  workflow      Workflow          @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  user          User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project       Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  revision      WorkflowRevision? @relation(fields: [workflowRevisionId], references: [id], onDelete: SetNull)
+  steps         WorkflowStepRun[]
+  retryOfRun    WorkflowRun?      @relation("WorkflowRunRetry", fields: [retryOfRunId], references: [id])
+  retries       WorkflowRun[]     @relation("WorkflowRunRetry")
+  aiUsageEvents AIUsage[]
+  parentRun     WorkflowRun?      @relation("WorkflowRunParentChild", fields: [parentRunId], references: [id], onDelete: Cascade)
+  childRuns     WorkflowRun[]     @relation("WorkflowRunParentChild")
+  parentStepRun WorkflowStepRun?  @relation("StepSpawnsChildRun", fields: [parentStepRunId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, idempotencyKey])
+  @@index([workflowId, createdAt])
+  @@index([userId, createdAt])
+  @@index([userId, status])
+  @@index([status, leaseExpiresAt])
+  @@index([workflowId, status])
+  @@index([workflowId, workflowVersion])
+  @@index([workflowRevisionId])
+  @@index([parentRunId])
+}
+
+model WorkflowStepRun {
+  id                  String                @id @default(cuid())
+  workflowRunId       String
+  /// The step's own local id from the Workflow's `steps` JSON — never trusted to still exist unchanged; resolved fresh against the Workflow at run start.
+  stepId              String
+  stepIndex           Int
+  stepType            String
+  outputVariable      String
+  status              WorkflowStepRunStatus @default(PENDING)
+  resolvedInput       String?               @db.Text
+  output              String?               @db.Text
+  errorMessage        String?               @db.Text
+  startedAt           DateTime?
+  completedAt         DateTime?
+  /// How many times this step has been prepared (fresh sequential run = 1; incremented only when a previously-abandoned, never-completed RUNNING attempt is reclaimed by an explicit resume). A step that already reached COMPLETED/FAILED never gets a new attempt.
+  attemptNumber       Int                   @default(1)
+  /// Opaque, server-minted per-attempt token returned to the client at prepare time and required back at complete/fail time — a completion carrying a stale token (from a superseded attempt) is rejected, never overwrites a newer result.
+  executionToken      String?
+  preparedAt          DateTime?
+  lastAttemptAt       DateTime?
+  /// completedAt - startedAt in milliseconds, stored once the step reaches a terminal status.
+  durationMs          Int?
+  /// Stable classification of errorMessage — see WorkflowRun.normalizedErrorCode / src/lib/ai-workflows/error-normalization.ts.
+  normalizedErrorCode String?
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+
+  workflowRun   WorkflowRun  @relation(fields: [workflowRunId], references: [id], onDelete: Cascade)
+  aiUsageEvents AIUsage[]
+  /// The child WorkflowRun this step spawned, when stepType is "workflow" (a SubWorkflow step) — back-relation only, the FK lives on WorkflowRun.parentStepRunId. Null for every other step type, and null for a "workflow" step that hasn't started its child run yet.
+  childRun      WorkflowRun? @relation("StepSpawnsChildRun")
+
+  @@index([workflowRunId, stepIndex])
+  @@index([workflowRunId, stepType])
 }
 
 // ---------------------------------------------------------------------------

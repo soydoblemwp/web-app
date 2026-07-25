@@ -1,0 +1,228 @@
+import type { AiToolDefinition } from "@/lib/ai-center/tools/types";
+import {
+  buildFacebookPostSystemPrompt,
+  buildFacebookPostPrompt,
+  buildLongFormPostSystemPrompt,
+  buildLongFormPostPrompt,
+  buildFacebookStorySystemPrompt,
+  buildFacebookStoryPrompt,
+  buildFacebookCaptionSystemPrompt,
+  buildFacebookCaptionPrompt,
+  buildFacebookCommentReplySystemPrompt,
+  buildFacebookCommentReplyPrompt,
+  buildFacebookAdCopySystemPrompt,
+  buildFacebookAdCopyPrompt,
+  buildCommunityEngagementSystemPrompt,
+  buildCommunityEngagementPrompt,
+  buildEventPromotionSystemPrompt,
+  buildEventPromotionPrompt,
+  buildFacebookPageBioSystemPrompt,
+  buildFacebookPageBioPrompt,
+  buildFacebookContentPlannerSystemPrompt,
+  buildFacebookContentPlannerPrompt,
+} from "@/lib/ai-center/tools/facebook-prompts";
+
+/**
+ * Every fully-implemented Facebook AI tool, as a declarative definition the
+ * generic AiGenerationForm engine can render — same pattern as youtube.ts,
+ * instagram.ts, social-media.ts, blog-seo.ts, email-marketing.ts and
+ * tiktok.ts. Registering these in src/lib/ai-center/tools/registry.ts is
+ * the only wiring Chat IA's intent router needs to start using them
+ * automatically.
+ */
+export const FACEBOOK_AI_TOOLS: AiToolDefinition[] = [
+  {
+    slug: "facebook-post-generator",
+    routeSegment: "post",
+    label: "Facebook Post Generator",
+    description: "Genera publicaciones de Facebook cercanas y conversacionales.",
+    fields: [
+      { name: "tema", label: "Tema", type: "textarea", required: true, maxLength: 500 },
+      { name: "tono", label: "Tono", type: "text", defaultValue: "Cercano y profesional", maxLength: 200, required: true },
+      { name: "idioma", label: "Idioma", type: "text", defaultValue: "es", maxLength: 10, required: true },
+      { name: "cantidad", label: "Cantidad de opciones", type: "number", defaultValue: 3, min: 1, max: 10, required: true },
+    ],
+    buildSystemPrompt: buildFacebookPostSystemPrompt,
+    buildUserPrompt: (v) => buildFacebookPostPrompt({ tema: v.tema, tono: v.tono, idioma: v.idioma, cantidad: v.cantidad }),
+    outputMode: "list",
+    buildItemTitle: (v) => `Post Facebook: ${v.tema}`,
+    contentType: "SOCIAL_TEXT",
+    resultKind: "CONTENT_GENERATION",
+  },
+  {
+    slug: "facebook-long-form-post",
+    routeSegment: "long-form-post",
+    label: "Long Form Post Generator",
+    description: "Escribe una publicación larga y narrativa aprovechando el formato extendido de Facebook.",
+    fields: [
+      { name: "tema", label: "Tema", type: "textarea", required: true, maxLength: 500 },
+      { name: "objetivo", label: "Objetivo de la publicación", type: "text", required: true, maxLength: 300 },
+      { name: "tono", label: "Tono", type: "text", defaultValue: "Cercano y profesional", maxLength: 200, required: true },
+      { name: "idioma", label: "Idioma", type: "text", defaultValue: "es", maxLength: 10, required: true },
+    ],
+    buildSystemPrompt: buildLongFormPostSystemPrompt,
+    buildUserPrompt: (v) =>
+      buildLongFormPostPrompt({ tema: v.tema, objetivo: v.objetivo, tono: v.tono, idioma: v.idioma }),
+    outputMode: "text",
+    buildItemTitle: (v) => `Publicación larga: ${v.tema}`,
+    contentType: "SOCIAL_TEXT",
+    resultKind: "CONTENT_GENERATION",
+  },
+  {
+    slug: "facebook-story",
+    routeSegment: "story",
+    label: "Story Generator",
+    description: "Genera texto breve para Stories de Facebook.",
+    fields: [
+      { name: "tema", label: "Tema", type: "textarea", required: true, maxLength: 500 },
+      { name: "tono", label: "Tono", type: "text", defaultValue: "Cercano y casual", maxLength: 200, required: true },
+      { name: "idioma", label: "Idioma", type: "text", defaultValue: "es", maxLength: 10, required: true },
+    ],
+    buildSystemPrompt: buildFacebookStorySystemPrompt,
+    buildUserPrompt: (v) => buildFacebookStoryPrompt({ tema: v.tema, tono: v.tono, idioma: v.idioma }),
+    outputMode: "list",
+    buildItemTitle: (v) => `Story Facebook: ${v.tema}`,
+    contentType: "SOCIAL_TEXT",
+    resultKind: "CONTENT_GENERATION",
+  },
+  {
+    slug: "facebook-caption",
+    routeSegment: "caption",
+    label: "Caption Generator",
+    description: "Genera captions de Facebook que complementan una imagen o vídeo.",
+    fields: [
+      { name: "tema", label: "Tema de la publicación", type: "textarea", required: true, maxLength: 500 },
+      { name: "tono", label: "Tono", type: "text", defaultValue: "Cercano y profesional", maxLength: 200, required: true },
+      { name: "idioma", label: "Idioma", type: "text", defaultValue: "es", maxLength: 10, required: true },
+      { name: "cantidad", label: "Cantidad de opciones", type: "number", defaultValue: 3, min: 1, max: 10, required: true },
+    ],
+    buildSystemPrompt: buildFacebookCaptionSystemPrompt,
+    buildUserPrompt: (v) =>
+      buildFacebookCaptionPrompt({ tema: v.tema, tono: v.tono, idioma: v.idioma, cantidad: v.cantidad }),
+    outputMode: "list",
+    buildItemTitle: (v) => `Caption Facebook: ${v.tema}`,
+    contentType: "SOCIAL_TEXT",
+    resultKind: "CONTENT_GENERATION",
+  },
+  {
+    slug: "facebook-comment-reply",
+    routeSegment: "comment-reply",
+    label: "Comment Reply Generator",
+    description: "Redacta una respuesta humana y cercana a un comentario de Facebook.",
+    fields: [
+      { name: "comentario", label: "Comentario a responder", type: "textarea", required: true, maxLength: 2000 },
+      { name: "tono", label: "Tono", type: "text", defaultValue: "Cercano y profesional", maxLength: 200, required: true },
+      { name: "idioma", label: "Idioma", type: "text", defaultValue: "es", maxLength: 10, required: true },
+    ],
+    buildSystemPrompt: buildFacebookCommentReplySystemPrompt,
+    buildUserPrompt: (v) => buildFacebookCommentReplyPrompt({ comentario: v.comentario, tono: v.tono, idioma: v.idioma }),
+    outputMode: "text",
+    buildItemTitle: () => "Respuesta a comentario",
+    contentType: "OTHER",
+    resultKind: "REPLY",
+  },
+  {
+    slug: "facebook-ad-copy",
+    routeSegment: "ad-copy",
+    label: "Facebook Ad Copy Generator",
+    description: "Genera copy de anuncio de Facebook Ads honesto, sin prometer resultados.",
+    fields: [
+      { name: "oferta", label: "Producto u oferta", type: "textarea", required: true, maxLength: 500 },
+      { name: "publicoObjetivo", label: "Público objetivo", type: "text", required: true, maxLength: 300 },
+      { name: "tono", label: "Tono", type: "text", defaultValue: "Cercano y profesional", maxLength: 200, required: true },
+      { name: "idioma", label: "Idioma", type: "text", defaultValue: "es", maxLength: 10, required: true },
+    ],
+    buildSystemPrompt: buildFacebookAdCopySystemPrompt,
+    buildUserPrompt: (v) =>
+      buildFacebookAdCopyPrompt({ oferta: v.oferta, publicoObjetivo: v.publicoObjetivo, tono: v.tono, idioma: v.idioma }),
+    outputMode: "text",
+    buildItemTitle: (v) => `Ad copy: ${v.oferta}`,
+    contentType: "AD",
+    resultKind: "CONTENT_GENERATION",
+  },
+  {
+    slug: "facebook-community-engagement",
+    routeSegment: "community-engagement",
+    label: "Community Engagement Generator",
+    description: "Genera publicaciones pensadas para fomentar conversación en Páginas y Grupos.",
+    fields: [
+      { name: "tema", label: "Tema", type: "textarea", required: true, maxLength: 500 },
+      { name: "idioma", label: "Idioma", type: "text", defaultValue: "es", maxLength: 10, required: true },
+      { name: "cantidad", label: "Cantidad de opciones", type: "number", defaultValue: 5, min: 1, max: 15, required: true },
+    ],
+    buildSystemPrompt: buildCommunityEngagementSystemPrompt,
+    buildUserPrompt: (v) => buildCommunityEngagementPrompt({ tema: v.tema, idioma: v.idioma, cantidad: v.cantidad }),
+    outputMode: "list",
+    buildItemTitle: (v) => `Engagement: ${v.tema}`,
+    contentType: "SOCIAL_TEXT",
+    resultKind: "CONTENT_GENERATION",
+  },
+  {
+    slug: "facebook-event-promotion",
+    routeSegment: "event-promotion",
+    label: "Event Promotion Generator",
+    description: "Genera una publicación de promoción de evento usando solo los datos que proporciones.",
+    fields: [
+      { name: "evento", label: "Evento", type: "textarea", required: true, maxLength: 500 },
+      { name: "fecha", label: "Fecha (opcional)", type: "text", maxLength: 100 },
+      { name: "tono", label: "Tono", type: "text", defaultValue: "Cercano y profesional", maxLength: 200, required: true },
+      { name: "idioma", label: "Idioma", type: "text", defaultValue: "es", maxLength: 10, required: true },
+    ],
+    buildSystemPrompt: buildEventPromotionSystemPrompt,
+    buildUserPrompt: (v) =>
+      buildEventPromotionPrompt({ evento: v.evento, fecha: v.fecha, tono: v.tono, idioma: v.idioma }),
+    outputMode: "text",
+    buildItemTitle: (v) => `Evento: ${v.evento}`,
+    contentType: "SOCIAL_TEXT",
+    resultKind: "CONTENT_GENERATION",
+  },
+  {
+    slug: "facebook-page-bio",
+    routeSegment: "bio",
+    label: "Facebook Page Bio Generator",
+    description: "Genera biografías de Página de Facebook dentro del límite de 101 caracteres.",
+    fields: [
+      { name: "tema", label: "Tema de la página", type: "textarea", required: true, maxLength: 500 },
+      { name: "propuestaValor", label: "Propuesta de valor", type: "text", maxLength: 300 },
+      { name: "tono", label: "Tono", type: "text", defaultValue: "Cercano y profesional", maxLength: 200, required: true },
+      { name: "idioma", label: "Idioma", type: "text", defaultValue: "es", maxLength: 10, required: true },
+      { name: "cantidad", label: "Cantidad de opciones", type: "number", defaultValue: 3, min: 1, max: 10, required: true },
+    ],
+    buildSystemPrompt: buildFacebookPageBioSystemPrompt,
+    buildUserPrompt: (v) =>
+      buildFacebookPageBioPrompt({
+        tema: v.tema,
+        propuestaValor: v.propuestaValor,
+        tono: v.tono,
+        idioma: v.idioma,
+        cantidad: v.cantidad,
+      }),
+    outputMode: "list",
+    buildItemTitle: (v) => `Bio Facebook: ${v.tema}`,
+    contentType: "OTHER",
+    resultKind: "CONTENT_GENERATION",
+  },
+  {
+    slug: "facebook-content-planner",
+    routeSegment: "content-planner",
+    label: "Facebook Content Planner",
+    description: "Genera un calendario de contenido de Facebook distribuido por días.",
+    fields: [
+      { name: "nicho", label: "Nicho de la página", type: "textarea", required: true, maxLength: 500 },
+      { name: "dias", label: "Días a planificar", type: "number", defaultValue: 7, min: 1, max: 30, required: true },
+      { name: "frecuencia", label: "Publicaciones por semana", type: "number", defaultValue: 3, min: 1, max: 21, required: true },
+      { name: "idioma", label: "Idioma", type: "text", defaultValue: "es", maxLength: 10, required: true },
+    ],
+    buildSystemPrompt: buildFacebookContentPlannerSystemPrompt,
+    buildUserPrompt: (v) =>
+      buildFacebookContentPlannerPrompt({ nicho: v.nicho, dias: v.dias, frecuencia: v.frecuencia, idioma: v.idioma }),
+    outputMode: "list",
+    buildItemTitle: (v) => `Calendario Facebook: ${v.nicho}`,
+    contentType: "OTHER",
+    resultKind: "CAMPAIGN_PLAN",
+  },
+];
+
+export function getFacebookTool(routeSegment: string): AiToolDefinition | undefined {
+  return FACEBOOK_AI_TOOLS.find((tool) => tool.routeSegment === routeSegment);
+}

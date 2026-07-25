@@ -4,6 +4,7 @@ import { isAdminRole } from "@/lib/permissions/roles";
 import { ProjectSwitcher } from "@/components/layout/project-switcher";
 import { UserMenu } from "@/components/layout/user-menu";
 import { NotificationsBell } from "@/components/layout/notifications-bell";
+import { ThemeToggle } from "@/components/layout/theme-toggle";
 import type { GlobalRole } from "@/generated/prisma/enums";
 
 export function Header({
@@ -24,6 +25,7 @@ export function Header({
       </Link>
       <div className="flex-1" />
       <ProjectSwitcher projects={projects} currentProjectId={currentProjectId} />
+      <ThemeToggle />
       <NotificationsBell unreadCount={unreadNotifications} />
       <UserMenu name={user.name} email={user.email} isAdmin={isAdminRole(user.role)} />
     </header>
