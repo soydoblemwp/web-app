@@ -316,11 +316,29 @@ describe("Security and no external document API integration", () => {
     }
   });
 
-  it("package.json has no new OCR/PDF/Office/Docs/AI-provider dependency added", () => {
+  it("package.json has no OCR or external AI-provider dependency — pdfjs-dist is now a real, deliberately-added dependency (Fase 42's PDF-to-image rendering for /herramientas), never used by Document AI (verified by the test above)", () => {
     const pkg = JSON.parse(read("package.json"));
     const deps = { ...pkg.dependencies, ...pkg.devDependencies };
-    for (const forbidden of ["openai", "tesseract.js", "pdf-parse", "pdfjs-dist", "mammoth", "googleapis"]) {
+    for (const forbidden of ["openai", "tesseract.js", "pdf-parse", "googleapis"]) {
       expect(deps[forbidden]).toBeUndefined();
+    }
+    // pdfjs-dist is real and intentional as of Fase 42 — confirm it's only reached from the public-tools PDF render module, never from Document AI.
+    expect(deps["pdfjs-dist"]).toBeDefined();
+    const renderModule = read("src/lib/public-tools/pdf/render.ts");
+    expect(renderModule).toMatch(/from\s+["']pdfjs-dist["']/);
+  });
+
+  it("mammoth/unpdf/cheerio (Fase 32's real document-extraction deps) are used ONLY by Knowledge Base — Document AI's own tool files never import them", () => {
+    const pkg = JSON.parse(read("package.json"));
+    const deps = { ...pkg.dependencies, ...pkg.devDependencies };
+    expect(deps.mammoth).toBeDefined();
+    expect(deps.unpdf).toBeDefined();
+    expect(deps.cheerio).toBeDefined();
+
+    const documentAiFiles = ["src/lib/ai-center/tools/document-ai.ts", "src/lib/ai-center/tools/document-ai-prompts.ts"];
+    for (const relativePath of documentAiFiles) {
+      const content = read(relativePath);
+      expect(content).not.toMatch(/from\s+["'](mammoth|unpdf|cheerio)["']/);
     }
   });
 });

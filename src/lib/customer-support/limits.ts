@@ -1,0 +1,37 @@
+/**
+ * Purely technical ceilings for the Customer Support Agent (Fase 40) — never
+ * a commercial/plan-based limit, same convention as
+ * src/lib/integrations/google-limits.ts / PERFORMANCE_LIMITS.
+ */
+export const CUSTOMER_SUPPORT_LIMITS = {
+  MAX_MESSAGE_LENGTH: 2000,
+  MAX_QUESTION_LENGTH: 500,
+  MAX_ANSWER_LENGTH: 5000,
+  MAX_SUGGESTED_QUESTIONS: 8,
+  MAX_ALIASES: 20,
+  MAX_ALIAS_LENGTH: 200,
+  MAX_INCLUDED_PATHS: 50,
+  MAX_EXCLUDED_PATHS: 50,
+  MAX_ALLOWED_DOMAINS: 10,
+  MIN_MESSAGES_PER_CONVERSATION: 1,
+  MAX_MESSAGES_PER_CONVERSATION: 200,
+  MIN_RETENTION_DAYS: 1,
+  MAX_RETENTION_DAYS: 365,
+  /** Bounded evidence-retrieval fan-out (spec section 13: "limita cantidad de fuentes/fragmentos/tamaño"). */
+  MAX_FAQ_CANDIDATES: 5,
+  MAX_KNOWLEDGE_FRAGMENTS: 4,
+  MAX_FRAGMENT_CHARS: 800,
+  MAX_TOTAL_CONTEXT_CHARS: 4000,
+  MAX_LINKS_PER_ANSWER: 5,
+  /** Public endpoint rate limiting (spec section 26). */
+  RATE_LIMIT_WINDOW_MS: 60_000,
+  MAX_MESSAGES_PER_MINUTE: 8,
+  MAX_SESSIONS_PER_HOUR: 20,
+  MAX_FEEDBACK_PER_MINUTE: 10,
+  MAX_HANDOFFS_PER_HOUR: 5,
+  MAX_CONCURRENT_REQUESTS_PER_VISITOR: 1,
+  HANDOFF_SUBJECT_MAX_LENGTH: 200,
+  HANDOFF_NOTE_MAX_LENGTH: 2000,
+  MAX_INTERNAL_NOTES: 100,
+  MAX_LOCAL_AI_TOKENS: 400,
+} as const;

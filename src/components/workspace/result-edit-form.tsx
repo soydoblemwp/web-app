@@ -1,9 +1,10 @@
 "use client";
 
+import { useRef, useState } from "react";
 import { updateContentItemAction } from "@/server/actions/content";
+import { RichEditor } from "@/components/editor/rich-editor";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 
 /**
@@ -11,7 +12,9 @@ import { Label } from "@/components/ui/label";
  * history card and AiGenerationForm's freshly-generated result, so there is
  * exactly one edit UI/one call site for updateContentItemAction. Only
  * title/body are editable; sourceTool and content type are never touched
- * (updateContentItemAction itself never writes them).
+ * (updateContentItemAction itself never writes them). Uses the official
+ * RichEditor (Fase 26) — same editor as the content detail page, never a
+ * second/parallel editing surface.
  */
 export function ResultEditForm({
   projectId,
@@ -27,33 +30,41 @@ export function ResultEditForm({
   /** Optional — lets a caller holding its own local copy of the text (like AiGenerationForm) refresh it without a page reload. */
   onSaved?: (values: { title: string; body: string }) => void;
 }) {
-  async function handleAction(formData: FormData) {
+  const [titleValue, setTitleValue] = useState(title);
+  const [saving, setSaving] = useState(false);
+  const bodyRef = useRef(body);
+
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSaving(true);
+    const formData = new FormData();
+    formData.set("id", contentItemId);
+    formData.set("title", titleValue);
+    formData.set("body", bodyRef.current);
     await updateContentItemAction(projectId, formData);
-    onSaved?.({
-      title: String(formData.get("title") ?? title),
-      body: String(formData.get("body") ?? body),
-    });
+    setSaving(false);
+    onSaved?.({ title: titleValue, body: bodyRef.current });
   }
 
   return (
-    <form action={handleAction} className="space-y-3">
-      <input type="hidden" name="id" value={contentItemId} />
+    <form onSubmit={handleSubmit} className="space-y-3">
       <div className="space-y-2">
         <Label htmlFor={`title-${contentItemId}`}>Título</Label>
-        <Input id={`title-${contentItemId}`} name="title" defaultValue={title} maxLength={300} required />
-      </div>
-      <div className="space-y-2">
-        <Label htmlFor={`body-${contentItemId}`}>Contenido</Label>
-        <Textarea
-          id={`body-${contentItemId}`}
-          name="body"
-          defaultValue={body}
-          rows={10}
-          className="font-mono text-sm"
+        <Input
+          id={`title-${contentItemId}`}
+          value={titleValue}
+          onChange={(e) => setTitleValue(e.target.value)}
+          maxLength={300}
           required
         />
       </div>
-      <Button type="submit">Guardar</Button>
+      <div className="space-y-2">
+        <Label>Contenido</Label>
+        <RichEditor projectId={projectId} content={body} onChangeHtml={(html) => (bodyRef.current = html)} />
+      </div>
+      <Button type="submit" disabled={saving}>
+        {saving ? "Guardando..." : "Guardar"}
+      </Button>
     </form>
   );
 }

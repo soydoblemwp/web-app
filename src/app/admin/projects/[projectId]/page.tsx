@@ -61,6 +61,7 @@ export default async function AdminProjectDetailPage({
       </div>
 
       <div className="flex flex-wrap gap-2">
+        <Button variant="outline" size="sm" render={<Link href={`/admin/projects/${project.id}/customer-support`}>Agente de soporte</Link>} />
         {project.status !== "ACTIVE" ? (
           <form action={setProjectStatusAdminAction.bind(null, project.id, "ACTIVE")}>
             <ConfirmSubmitButton variant="outline" size="sm" confirmMessage={`¿Reactivar el proyecto "${project.name}"?`}>

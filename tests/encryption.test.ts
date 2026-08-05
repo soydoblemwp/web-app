@@ -11,8 +11,20 @@ describe("encryptSecret / decryptSecret", () => {
     const encrypted = encryptSecret(plaintext);
 
     expect(encrypted).not.toBe(plaintext);
-    expect(encrypted.split(".")).toHaveLength(3);
+    // Fase 39: encryptSecret now always writes the versioned 4-part format ("v1" + iv + authTag + ciphertext) —
+    // decryptSecret still reads the legacy unversioned 3-part format for rows written before this change.
+    expect(encrypted.split(".")).toHaveLength(4);
+    expect(encrypted.startsWith("v1.")).toBe(true);
     expect(decryptSecret(encrypted)).toBe(plaintext);
+  });
+
+  it("still decrypts the legacy (pre-Fase-39) unversioned 3-part format", async () => {
+    const { encryptSecret, decryptSecret } = await import("@/lib/security/encryption");
+    const plaintext = "legacy-wordpress-app-password";
+    const versioned = encryptSecret(plaintext);
+    const [, iv, tag, data] = versioned.split(".");
+    const legacy = [iv, tag, data].join(".");
+    expect(decryptSecret(legacy)).toBe(plaintext);
   });
 
   it("produces a different ciphertext each time (random IV)", async () => {
@@ -25,8 +37,8 @@ describe("encryptSecret / decryptSecret", () => {
   it("throws when the payload has been tampered with", async () => {
     const { encryptSecret, decryptSecret } = await import("@/lib/security/encryption");
     const encrypted = encryptSecret("sensitive-token");
-    const [iv, tag, data] = encrypted.split(".");
-    const tampered = [iv, tag, data.slice(0, -2) + "AA"].join(".");
+    const [version, iv, tag, data] = encrypted.split(".");
+    const tampered = [version, iv, tag, data.slice(0, -2) + "AA"].join(".");
     expect(() => decryptSecret(tampered)).toThrow();
   });
 });

@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db/prisma";
 import { removeProjectMemberAction, archiveProjectSettingsAction } from "@/server/actions/project-settings";
 import { UpdateProjectForm } from "@/components/project-settings/update-project-form";
 import { AddMemberForm } from "@/components/project-settings/add-member-form";
+import { PublishingPolicyForm } from "@/components/project-settings/publishing-policy-form";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -60,6 +61,19 @@ export default async function ProjectSettingsPage({ params }: { params: Promise<
               </li>
             ))}
           </ul>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Publishing Hub</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <PublishingPolicyForm
+            projectId={projectId}
+            requireApprovalBeforePublish={project.requireApprovalBeforePublish}
+            allowSelfApproval={project.allowSelfApproval}
+          />
         </CardContent>
       </Card>
 

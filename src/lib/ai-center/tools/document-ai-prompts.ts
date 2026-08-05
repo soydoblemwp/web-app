@@ -14,38 +14,21 @@
  * invent facts, figures, names, dates or clauses that aren't in the
  * source, never silently change important data, and say so plainly when
  * context is missing instead of guessing.
+ *
+ * Fase 41 correction: the rewriter, summarizer and grammar-style checker
+ * below are no longer independent copies — they re-export the shared
+ * "rewrite"/"summarize"/"grammar" capability cores under
+ * `src/lib/ai-capabilities/*`, which the public `/herramientas` tools call
+ * too. The re-export keeps every name this file already exported (and thus
+ * `document-ai.ts`'s wiring) completely unchanged — this is an extraction,
+ * not a behavior change.
  */
 
-const NO_INVENTED_CONTENT_RULE =
-  "Trabaja únicamente con el texto que te proporcione el usuario. No inventes datos, cifras, nombres, fechas, cláusulas ni hechos que no estén en el documento original. Si falta contexto necesario para completar la tarea con precisión, indícalo claramente en tu respuesta en lugar de suponerlo.";
-
-const PRESERVE_KEY_DATA_RULE =
-  "No alteres datos importantes del documento original (cifras, fechas, nombres propios, cantidades, condiciones, cláusulas) — consérvalos exactamente como aparecen en el texto proporcionado.";
-
-const TEXT_ONLY_NOTE =
-  "Solo trabajas con el texto que el usuario pega directamente en el formulario — no tienes acceso a archivos PDF, Word, Google Docs ni a ningún sistema externo, y no realizas reconocimiento óptico de caracteres (OCR).";
-
-export function buildDocumentSummarizerSystemPrompt(context: string): string {
-  return [
-    "Eres el resumidor de documentos de AI Content Hub.",
-    NO_INVENTED_CONTENT_RULE,
-    PRESERVE_KEY_DATA_RULE,
-    TEXT_ONLY_NOTE,
-    "Produce un resumen fiel al documento original, con la extensión indicada, cubriendo únicamente las ideas que realmente aparecen en el texto.",
-    "Devuelve únicamente el resumen final, sin explicaciones adicionales.",
-    "",
-    context,
-  ].join("\n");
-}
-
-export function buildDocumentSummarizerPrompt(values: { documento: string; longitud: string; idioma: string }): string {
-  return [
-    `Longitud deseada del resumen: ${values.longitud}.`,
-    `Idioma: ${values.idioma}.`,
-    "Documento a resumir (usa solo este texto):",
-    `"""${values.documento}"""`,
-  ].join("\n");
-}
+export { NO_INVENTED_CONTENT_RULE, PRESERVE_KEY_DATA_RULE, TEXT_ONLY_NOTE } from "@/lib/ai-capabilities/shared-rules";
+import { NO_INVENTED_CONTENT_RULE, PRESERVE_KEY_DATA_RULE, TEXT_ONLY_NOTE } from "@/lib/ai-capabilities/shared-rules";
+export { buildRewriteSystemPrompt as buildDocumentRewriterSystemPrompt, buildRewritePrompt as buildDocumentRewriterPrompt } from "@/lib/ai-capabilities/rewrite/prompt";
+export { buildSummarizeSystemPrompt as buildDocumentSummarizerSystemPrompt, buildSummarizePrompt as buildDocumentSummarizerPrompt } from "@/lib/ai-capabilities/summarize/prompt";
+export { buildGrammarSystemPrompt as buildGrammarStyleCheckerSystemPrompt, buildGrammarPrompt as buildGrammarStyleCheckerPrompt } from "@/lib/ai-capabilities/grammar/prompt";
 
 export function buildDocumentTranslatorSystemPrompt(context: string): string {
   return [
@@ -65,49 +48,6 @@ export function buildDocumentTranslatorPrompt(values: { documento: string; idiom
     values.idiomaOrigen ? `Idioma de origen: ${values.idiomaOrigen}.` : "Idioma de origen: detéctalo del propio texto.",
     `Idioma de destino: ${values.idiomaDestino}.`,
     "Documento a traducir (usa solo este texto):",
-    `"""${values.documento}"""`,
-  ].join("\n");
-}
-
-export function buildGrammarStyleCheckerSystemPrompt(context: string): string {
-  return [
-    "Eres el corrector de gramática y estilo de AI Content Hub.",
-    NO_INVENTED_CONTENT_RULE,
-    PRESERVE_KEY_DATA_RULE,
-    TEXT_ONLY_NOTE,
-    "Corrige ortografía, gramática, puntuación y estilo del documento sin cambiar su significado, su estructura de ideas ni ningún dato factual. No añadas contenido nuevo ni elimines información.",
-    "Devuelve únicamente el texto corregido, sin explicaciones adicionales.",
-    "",
-    context,
-  ].join("\n");
-}
-
-export function buildGrammarStyleCheckerPrompt(values: { documento: string; idioma: string }): string {
-  return [
-    `Idioma del texto: ${values.idioma}.`,
-    "Documento a corregir (usa solo este texto):",
-    `"""${values.documento}"""`,
-  ].join("\n");
-}
-
-export function buildDocumentRewriterSystemPrompt(context: string): string {
-  return [
-    "Eres el reescritor de documentos de AI Content Hub.",
-    NO_INVENTED_CONTENT_RULE,
-    PRESERVE_KEY_DATA_RULE,
-    TEXT_ONLY_NOTE,
-    "Reescribe el documento con el tono indicado, conservando el significado original y todos los datos importantes — solo cambia la redacción, nunca los hechos.",
-    "Devuelve únicamente el texto reescrito, sin explicaciones adicionales.",
-    "",
-    context,
-  ].join("\n");
-}
-
-export function buildDocumentRewriterPrompt(values: { documento: string; tono: string; idioma: string }): string {
-  return [
-    `Tono deseado: ${values.tono}.`,
-    `Idioma: ${values.idioma}.`,
-    "Documento a reescribir (usa solo este texto):",
     `"""${values.documento}"""`,
   ].join("\n");
 }

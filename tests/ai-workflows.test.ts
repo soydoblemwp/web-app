@@ -158,6 +158,11 @@ describe("validateWorkflowSteps", () => {
         brandProfileId: type === "brand_kit" ? "default" : undefined,
         transformKind: type === "transform" ? "uppercase" : undefined,
         childWorkflowId: type === "workflow" ? "wf-child-1" : undefined,
+        agentRef: type === "agent" ? "writing-agent" : undefined,
+        knowledgeQuery: type === "knowledge" ? "políticas de devolución" : undefined,
+        knowledgeCollectionIds: type === "knowledge" ? ["col-1"] : undefined,
+        performanceOperation: type === "performance" ? "query" : undefined,
+        performanceMetricKeys: type === "performance" ? ["content_items_created"] : undefined,
         inputTemplate: "{{titulo}}",
       });
       expect(validateWorkflowSteps([s]).some((issue) => issue.code === "missing_reference")).toBe(false);

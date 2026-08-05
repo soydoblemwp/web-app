@@ -19,6 +19,9 @@ export default async function AccountPage({
 }) {
   const currentUser = await getCurrentUser();
   if (!currentUser) redirect("/login");
+  // Outside proxy.ts's /dashboard/:path* matcher (this route group doesn't
+  // appear in the URL), so it needs its own check — same as /notifications.
+  if (!currentUser.emailVerified) redirect("/verify-email");
   const { error } = await searchParams;
 
   const user = await prisma.user.findUniqueOrThrow({ where: { id: currentUser.id } });

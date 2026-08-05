@@ -1,0 +1,162 @@
+/* Content styling for the RichEditor's ProseMirror document. Scoped under
+   .rich-editor-content so it never leaks into the rest of the app; relies on
+   the same Tailwind design tokens (var(--foreground) etc.) the rest of the UI
+   uses, so dark mode (the .dark class on <html>, see next-themes provider)
+   is automatic — no separate dark-mode ruleset needed here. */
+
+.rich-editor-content .tiptap {
+  outline: none;
+  min-height: 12rem;
+}
+
+.rich-editor-content .tiptap > * + * {
+  margin-top: 0.75em;
+}
+
+.rich-editor-content .tiptap h1 {
+  font-size: 1.875em;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.rich-editor-content .tiptap h2 {
+  font-size: 1.5em;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.rich-editor-content .tiptap h3 {
+  font-size: 1.25em;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.rich-editor-content .tiptap ul,
+.rich-editor-content .tiptap ol {
+  padding-left: 1.5em;
+}
+
+.rich-editor-content .tiptap ul {
+  list-style: disc;
+}
+
+.rich-editor-content .tiptap ol {
+  list-style: decimal;
+}
+
+.rich-editor-content .tiptap ul[data-type="taskList"] {
+  list-style: none;
+  padding-left: 0;
+}
+
+.rich-editor-content .tiptap ul[data-type="taskList"] li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5em;
+}
+
+.rich-editor-content .tiptap ul[data-type="taskList"] li > label {
+  margin-top: 0.2em;
+  user-select: none;
+}
+
+.rich-editor-content .tiptap blockquote {
+  border-left: 3px solid var(--border);
+  padding-left: 1em;
+  color: var(--muted-foreground);
+  font-style: italic;
+}
+
+.rich-editor-content .tiptap code {
+  background: var(--muted);
+  border-radius: 0.25em;
+  padding: 0.15em 0.35em;
+  font-size: 0.9em;
+}
+
+.rich-editor-content .tiptap pre {
+  background: var(--muted);
+  border-radius: 0.5em;
+  padding: 0.75em 1em;
+  overflow-x: auto;
+}
+
+.rich-editor-content .tiptap pre code {
+  background: none;
+  padding: 0;
+}
+
+.rich-editor-content .tiptap hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 1.5em 0;
+}
+
+.rich-editor-content .tiptap a {
+  color: var(--primary);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.rich-editor-content .tiptap img {
+  max-width: 100%;
+  border-radius: 0.5em;
+}
+
+.rich-editor-content .tiptap table {
+  border-collapse: collapse;
+  width: 100%;
+  table-layout: fixed;
+}
+
+.rich-editor-content .tiptap th,
+.rich-editor-content .tiptap td {
+  border: 1px solid var(--border);
+  padding: 0.5em 0.75em;
+  vertical-align: top;
+  position: relative;
+}
+
+.rich-editor-content .tiptap th {
+  background: var(--muted);
+  font-weight: 600;
+  text-align: left;
+}
+
+.rich-editor-content .tiptap p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  color: var(--muted-foreground);
+  pointer-events: none;
+}
+
+/* Modo enfoque: dim every block except the one containing the cursor
+   (Focus extension, see src/lib/editor/extensions.ts). Off by default —
+   only active while [data-focus-mode="true"] is set on the wrapper. */
+.rich-editor-content[data-focus-mode="true"] .tiptap > * {
+  opacity: 0.35;
+  transition: opacity 0.15s ease;
+}
+
+.rich-editor-content[data-focus-mode="true"] .tiptap > .editor-focused-block {
+  opacity: 1;
+}
+
+/* Drag handle (@tiptap/extension-drag-handle-react) */
+.rich-editor-drag-handle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.25rem;
+  height: 1.5rem;
+  border-radius: 0.25rem;
+  color: var(--muted-foreground);
+  cursor: grab;
+  opacity: 0.6;
+}
+
+.rich-editor-drag-handle:hover {
+  background: var(--muted);
+  opacity: 1;
+}

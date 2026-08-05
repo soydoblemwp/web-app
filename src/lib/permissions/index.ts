@@ -2,9 +2,9 @@ import "server-only";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db/prisma";
 import type { GlobalRole, ProjectRole } from "@/generated/prisma/enums";
-import { ADMIN_ROLES, ForbiddenError, UnauthorizedError } from "@/lib/permissions/roles";
+import { ADMIN_ROLES, EmailNotVerifiedError, ForbiddenError, UnauthorizedError } from "@/lib/permissions/roles";
 
-export { ForbiddenError, UnauthorizedError } from "@/lib/permissions/roles";
+export { EmailNotVerifiedError, ForbiddenError, UnauthorizedError } from "@/lib/permissions/roles";
 
 const PROJECT_ROLE_RANK: Record<ProjectRole, number> = {
   VIEWER: 0,
@@ -18,9 +18,11 @@ export interface CurrentUser {
   email: string;
   name: string | null;
   role: GlobalRole;
+  /** From the session's own JWT claim (see src/lib/auth/edge-config.ts) — never re-derived here. getCurrentUser() itself never throws or filters on this; it's requireUser()'s job to enforce it, so a caller that genuinely needs to read an unverified user's identity (the /verify-email page itself, the resend action, logout) still can. */
+  emailVerified: boolean;
 }
 
-/** Reads the authenticated session. Returns null when logged out — never throws. */
+/** Reads the authenticated session. Returns null when logged out — never throws, and never rejects an unverified account either (see requireUser() for that). */
 export async function getCurrentUser(): Promise<CurrentUser | null> {
   const session = await auth();
   if (!session?.user?.id) return null;
@@ -29,13 +31,26 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
     email: session.user.email ?? "",
     name: session.user.name ?? null,
     role: session.user.role,
+    emailVerified: Boolean(session.user.emailVerified),
   };
 }
 
-/** Throws UnauthorizedError when there is no logged-in user. Use at the top of every server action. */
+/**
+ * Throws UnauthorizedError when there is no logged-in user, and
+ * EmailNotVerifiedError when there is a session but its account hasn't
+ * completed email verification. Use at the top of every server action that
+ * performs a real, sensitive operation — this is the single central point
+ * every one of them already funnels through (directly, or via
+ * requireAdmin/requireSuperAdmin/requireProjectAccess below), so "no debe
+ * crear ni usar proyectos" etc. is enforced once here rather than repeated
+ * per action. Deliberately NOT enforced inside getCurrentUser() itself —
+ * the verification pending screen, the resend action, and logout all need
+ * to keep working for a real, authenticated-but-unverified user.
+ */
 export async function requireUser(): Promise<CurrentUser> {
   const user = await getCurrentUser();
   if (!user) throw new UnauthorizedError();
+  if (!user.emailVerified) throw new EmailNotVerifiedError();
   return user;
 }
 

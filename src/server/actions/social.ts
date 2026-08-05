@@ -5,6 +5,8 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db/prisma";
 import { requireProjectAccess } from "@/lib/permissions";
 import { createSocialPostSchema } from "@/lib/validation/social";
+import type { SocialPlatform } from "@/generated/prisma/enums";
+import { publishAutomationEvent } from "@/server/services/automation-events";
 
 export interface SocialPostFormState {
   error?: string;
@@ -55,6 +57,15 @@ export async function createSocialPostAction(
     },
   });
 
+  await publishAutomationEvent({
+    projectId,
+    eventKey: "social_post.created",
+    resourceId: post.id,
+    actorId: user.id,
+    payload: { id: post.id, platform: post.platform, status: post.status },
+    idempotencyKey: `social_post.created:${post.id}`,
+  });
+
   revalidatePath(`/dashboard/${projectId}/social`);
   revalidatePath(`/dashboard/${projectId}/calendar`);
   redirect(`/dashboard/${projectId}/social/${post.id}`);
@@ -86,7 +97,20 @@ const VALID_STATUSES = ["IDEA", "DRAFT", "IN_REVIEW", "APPROVED", "SCHEDULED", "
 export async function changeSocialPostStatusAction(projectId: string, postId: string, status: string) {
   await requireProjectAccess(projectId, "EDITOR");
   if (!VALID_STATUSES.includes(status)) return;
+  const before = await prisma.socialPost.findUnique({ where: { id: postId }, select: { status: true, platform: true, projectId: true } });
+  if (!before || before.projectId !== projectId) return;
   await prisma.socialPost.update({ where: { id: postId }, data: { status: status as never } });
+
+  if (before.status !== status) {
+    await publishAutomationEvent({
+      projectId,
+      eventKey: "social_post.status_changed",
+      resourceId: postId,
+      payload: { id: postId, platform: before.platform, status, previous: before.status, current: status, changedFields: ["status"] },
+      idempotencyKey: `social_post.status_changed:${postId}:${before.status}:${status}:${Date.now()}`,
+    });
+  }
+
   revalidatePath(`/dashboard/${projectId}/social`);
   revalidatePath(`/dashboard/${projectId}/social/${postId}`);
   revalidatePath(`/dashboard/${projectId}/calendar`);
@@ -147,6 +171,80 @@ export async function addSocialMetricAction(projectId: string, postId: string, f
 
   revalidatePath(`/dashboard/${projectId}/social/${postId}`);
   revalidatePath(`/dashboard/${projectId}/analytics`);
+}
+
+export interface ScheduleContentForPublicationInput {
+  contentId: string;
+  platform: SocialPlatform;
+  text: string;
+  scheduledAt: string;
+  timezone: string;
+  campaignId?: string | null;
+  tags?: string[];
+}
+
+/**
+ * Editor sidebar "Publicación" tab — schedules a ContentItem onto a channel
+ * by creating (or reusing) a SocialPost, the same model the existing
+ * Calendar page already reads (see src/app/(dashboard)/dashboard/[projectId]/calendar/page.tsx,
+ * which queries SocialPost.scheduledAt directly). "Evita duplicados": looks
+ * up an existing SocialPost for this exact {content, platform} pair first —
+ * scheduling the same content to the same channel twice reschedules the one
+ * post instead of creating a second calendar entry.
+ */
+export async function scheduleContentForPublicationAction(
+  projectId: string,
+  input: ScheduleContentForPublicationInput
+): Promise<{ error?: string; id?: string }> {
+  const user = await requireProjectAccess(projectId, "EDITOR");
+
+  if (!input.text.trim()) return { error: "El texto de la publicación no puede estar vacío." };
+
+  const contentItem = await prisma.contentItem.findUnique({ where: { id: input.contentId } });
+  if (!contentItem || contentItem.projectId !== projectId) return { error: "Contenido no encontrado." };
+
+  const existing = await prisma.socialPost.findFirst({
+    where: { projectId, sourceContentId: input.contentId, platform: input.platform },
+  });
+
+  const scheduledData = {
+    text: input.text,
+    scheduledAt: new Date(input.scheduledAt),
+    timezone: input.timezone,
+    status: "SCHEDULED" as const,
+    campaignId: input.campaignId || null,
+    tags: input.tags ?? [],
+  };
+
+  const post = existing
+    ? await prisma.socialPost.update({ where: { id: existing.id }, data: scheduledData })
+    : await prisma.socialPost.create({
+        data: {
+          projectId,
+          authorId: user.id,
+          platform: input.platform,
+          postType: "post",
+          internalTitle: contentItem.title.slice(0, 120),
+          sourceContentId: input.contentId,
+          ...scheduledData,
+        },
+      });
+
+  await prisma.contentItem.update({ where: { id: input.contentId }, data: { status: "SCHEDULED" } });
+
+  revalidatePath(`/dashboard/${projectId}/calendar`);
+  revalidatePath(`/dashboard/${projectId}/content/${input.contentId}`);
+  return { id: post.id };
+}
+
+/** Every SocialPost currently scheduled/published from this ContentItem — editor sidebar's "Publicación" tab. */
+export async function listContentSchedulesAction(projectId: string, contentId: string) {
+  await requireProjectAccess(projectId, "VIEWER");
+  return prisma.socialPost.findMany({
+    where: { projectId, sourceContentId: contentId },
+    orderBy: { scheduledAt: "asc" },
+    select: { id: true, platform: true, scheduledAt: true, timezone: true, status: true, campaignId: true, tags: true },
+  });
 }
 
 export async function deleteSocialPostAction(projectId: string, postId: string) {

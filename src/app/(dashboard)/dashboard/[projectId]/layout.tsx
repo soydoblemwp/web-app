@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db/prisma";
 import { listProjectsForUser, getProjectForUser } from "@/server/services/project";
 import { Header } from "@/components/layout/header";
 import { Sidebar } from "@/components/layout/sidebar";
+import { CustomerSupportWidgetMount } from "@/components/customer-support/widget/widget-mount";
 
 export default async function ProjectLayout({
   children,
@@ -38,6 +39,8 @@ export default async function ProjectLayout({
         <Sidebar projectId={project.id} />
         <main className="flex-1 overflow-y-auto px-6 py-6">{children}</main>
       </div>
+      {/* Isolated, lazy-loaded, error-boundary-wrapped — a widget failure never affects Header/Sidebar/main above (Fase 40 spec section 2). */}
+      <CustomerSupportWidgetMount projectId={project.id} />
     </div>
   );
 }

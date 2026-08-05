@@ -1,6 +1,6 @@
 "use server";
 
-import { AuthError } from "next-auth";
+import { AuthError, CredentialsSignin } from "next-auth";
 import { signIn } from "@/auth";
 import { loginSchema } from "@/lib/validation/auth";
 import { isSafeRedirectTarget } from "@/lib/auth/safe-redirect";
@@ -36,6 +36,14 @@ export async function loginAction(
     });
     return {};
   } catch (error) {
+    // Only ever thrown from authorize() after the password has already
+    // been verified correct — see src/lib/auth/config.ts. Checked before
+    // the generic AuthError fallback below (CredentialsSignin extends
+    // AuthError, so order matters) so this specific, non-sensitive reason
+    // gets its own clear message instead of the generic one.
+    if (error instanceof CredentialsSignin && error.code === "email_not_verified") {
+      return { error: "Debes verificar tu correo antes de iniciar sesión. Revisa tu bandeja de entrada o solicita un nuevo enlace." };
+    }
     if (error instanceof AuthError) {
       return { error: "Correo o contraseña incorrectos." };
     }

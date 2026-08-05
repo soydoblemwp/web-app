@@ -20,6 +20,14 @@ export const authEdgeConfig: NextAuthConfig = {
       if (user) {
         token.role = (user as { role?: GlobalRole }).role ?? "USER";
         token.id = user.id;
+        // Captured once, at sign-in, from whatever authorize() returned —
+        // authorize() already refuses to sign in an unverified account, so
+        // every JWT minted from here on only ever carries a real Date. A
+        // JWT that predates this feature simply won't have this claim at
+        // all (undefined), which the proxy/permissions checks below
+        // correctly treat as falsy — "not verified" (fail closed), never
+        // "verified".
+        token.emailVerified = (user as { emailVerified?: Date | null }).emailVerified ?? null;
       }
       return token;
     },
@@ -27,6 +35,7 @@ export const authEdgeConfig: NextAuthConfig = {
       if (session.user) {
         session.user.id = token.id as string;
         session.user.role = token.role as GlobalRole;
+        session.user.emailVerified = (token.emailVerified as Date | null | undefined) ?? null;
       }
       return session;
     },

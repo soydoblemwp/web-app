@@ -433,12 +433,15 @@ describe("Security: real execution enforces isolation, ownership, and active-wor
     expect(fn).toMatch(/executionMode: "DRAFT_TEST",/);
   });
 
-  it("prepareWorkflowStepAction re-verifies run ownership, project match, sequential order, and the max-duration ceiling — all server-side", () => {
-    const fn = actions.match(/export async function prepareWorkflowStepAction[\s\S]*?\n(?=export )/)![0];
-    expect(fn).toMatch(/requireProjectAccess\(input\.projectId, "VIEWER"\)/);
-    expect(fn).toMatch(/run\.projectId !== input\.projectId/);
-    expect(fn).toMatch(/isRunDurationExceeded\(/);
-    expect(fn).toMatch(/isNextRunnableStepIndex\(/);
+  it("prepareWorkflowStepAction re-verifies the session, then delegates to prepareWorkflowStepCore (also reused by Automation Center) which re-checks project match, sequential order, and the max-duration ceiling — all server-side", () => {
+    const wrapper = actions.match(/export async function prepareWorkflowStepAction[\s\S]*?\n\}/)![0];
+    expect(wrapper).toMatch(/requireProjectAccess\(input\.projectId, "VIEWER"\)/);
+    expect(wrapper).toMatch(/return prepareWorkflowStepCore\(user\.id, input\);/);
+
+    const core = actions.match(/export async function prepareWorkflowStepCore[\s\S]*?\n(?=export )/)![0];
+    expect(core).toMatch(/run\.projectId !== input\.projectId/);
+    expect(core).toMatch(/isRunDurationExceeded\(/);
+    expect(core).toMatch(/isNextRunnableStepIndex\(/);
   });
 
   it("buildResourcesForStep (shared in workflow-resources.ts, reused by execution AND publish-time validation) rejects a Prompt Library prompt or AI Template that belongs to a different project ('acceso al proyecto cuando corresponda')", () => {
@@ -483,7 +486,7 @@ describe("Idempotency: DB-backed, one key = one run", () => {
     const actions = read("src/server/actions/workflow-execution.ts");
     const startFn = actions.match(/export async function startWorkflowRunAction[\s\S]*?\n\}/)![0];
     expect(startFn).toMatch(/beginFreshRun\(/);
-    const createFn = actions.match(/async function createRunFromSnapshot[\s\S]*?\n(?=async function beginFreshRun)/)![0];
+    const createFn = actions.match(/async function createRunFromSnapshot[\s\S]*?\n(?=\/\*\*[\s\S]*?export async function beginFreshRun)/)![0];
     expect(createFn).toMatch(/prisma\.workflowRun\.upsert\(/);
     expect(createFn).toMatch(/where: \{ userId_idempotencyKey: \{ userId: params\.userId, idempotencyKey: params\.idempotencyKey \} \}/);
     expect(createFn).toMatch(/update: \{\}/); // a replay never mutates the existing run
@@ -497,7 +500,7 @@ describe("Idempotency: DB-backed, one key = one run", () => {
 
   it("a run created for one workflow is refused if replayed with the same key against a different workflow", () => {
     const actions = read("src/server/actions/workflow-execution.ts");
-    const fn = actions.match(/async function createRunFromSnapshot[\s\S]*?\n(?=async function beginFreshRun)/)![0];
+    const fn = actions.match(/async function createRunFromSnapshot[\s\S]*?\n(?=\/\*\*[\s\S]*?export async function beginFreshRun)/)![0];
     expect(fn).toMatch(/if \(created\.workflowId !== params\.workflowId\) \{/);
   });
 
@@ -513,14 +516,20 @@ describe("Idempotency: DB-backed, one key = one run", () => {
 describe("Cancellation", () => {
   const actions = read("src/server/actions/workflow-execution.ts");
 
-  it("cancelWorkflowRunAction verifies ownership and is a no-op (not an error) on an already-terminal run", () => {
-    const fn = actions.match(/export async function cancelWorkflowRunAction[\s\S]*?\n\}/)![0];
-    expect(fn).toMatch(/getWorkflowRunForUser\(runId, user\.id\)/);
+  it("cancelWorkflowRunAction delegates to the real, reusable cancelWorkflowRunCore (also reused by Automation Center) after resolving the session", () => {
+    const wrapper = actions.match(/export async function cancelWorkflowRunAction[\s\S]*?\n\}/)![0];
+    expect(wrapper).toMatch(/requireProjectAccess\(projectId, "VIEWER"\)/);
+    expect(wrapper).toMatch(/return cancelWorkflowRunCore\(user\.id, projectId, runId\);/);
+  });
+
+  it("cancelWorkflowRunCore verifies ownership and is a no-op (not an error) on an already-terminal run", () => {
+    const fn = actions.match(/export async function cancelWorkflowRunCore[\s\S]*?\n\}/)![0];
+    expect(fn).toMatch(/getWorkflowRunForUser\(runId, userId\)/);
     expect(fn).toMatch(/if \(isRunTerminal\(run\.status\)\) return \{\};/);
   });
 
   it("cancellation marks the run CANCELLED (and releases its lease), the currently-RUNNING step CANCELLED (the local engine really can abort it), and every PENDING step CANCELLED — completed steps are never touched", () => {
-    const fn = actions.match(/export async function cancelWorkflowRunAction[\s\S]*?\n\}/)![0];
+    const fn = actions.match(/export async function cancelWorkflowRunCore[\s\S]*?\n\}/)![0];
     expect(fn).toMatch(/status: "CANCELLED",\s*\n\s*cancelledAt: now,\s*\n\s*completedAt: now,/);
     expect(fn).toMatch(/leaseId: null,/);
     expect(fn).toMatch(/where: \{ workflowRunId: run\.id, status: "RUNNING" \}/);

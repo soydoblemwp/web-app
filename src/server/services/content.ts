@@ -30,8 +30,17 @@ export async function getContentItem(id: string) {
     where: { id },
     include: {
       author: { select: { name: true, email: true } },
-      versions: { orderBy: { createdAt: "desc" } },
+      versions: { orderBy: { createdAt: "desc" }, include: { author: { select: { name: true, email: true } } } },
       tags: { include: { tag: true } },
+      brandProfile: { select: { id: true, name: true } },
+      campaignPiece: {
+        select: {
+          id: true,
+          scheduledDate: true,
+          campaign: { select: { id: true, name: true } },
+          pillar: { select: { id: true, name: true, color: true } },
+        },
+      },
     },
   });
 }

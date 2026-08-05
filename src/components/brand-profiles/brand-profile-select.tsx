@@ -21,12 +21,18 @@ const NONE_VALUE = "__none__";
 export function BrandProfileSelect({
   projectId,
   onContextChange,
+  onProfileChange,
+  initialProfileId,
 }: {
   projectId: string;
   onContextChange: (context: string) => void;
+  /** Optional — lets a caller (e.g. the editor sidebar's "Resumen" tab) persist WHICH profile was used, not just its rendered context text. */
+  onProfileChange?: (profile: BrandProfileLike | null) => void;
+  /** Optional — pre-selects a specific profile (e.g. one already saved on a ContentItem) instead of defaulting to "Automático". */
+  initialProfileId?: string | null;
 }) {
   const [profiles, setProfiles] = useState<BrandProfileLike[]>([]);
-  const [selected, setSelected] = useState<string>(AUTO_VALUE);
+  const [selected, setSelected] = useState<string>(initialProfileId ?? AUTO_VALUE);
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
@@ -35,13 +41,22 @@ export function BrandProfileSelect({
       if (cancelled) return;
       setProfiles(result);
       setLoaded(true);
+      const preselected = initialProfileId ? result.find((profile) => profile.id === initialProfileId) : undefined;
+      if (preselected) {
+        onContextChange(buildBrandProfileContext(preselected));
+        onProfileChange?.(preselected);
+        return;
+      }
       const defaultProfile = result.find((profile) => profile.isDefault);
-      if (defaultProfile) onContextChange(buildBrandProfileContext(defaultProfile));
+      if (defaultProfile) {
+        onContextChange(buildBrandProfileContext(defaultProfile));
+        onProfileChange?.(defaultProfile);
+      }
     });
     return () => {
       cancelled = true;
     };
-    // Only re-fetch if the project itself changes — onContextChange is a stable setter from the parent.
+    // Only re-fetch if the project itself changes — onContextChange/onProfileChange are stable setters from the parent.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId]);
 
@@ -51,15 +66,18 @@ export function BrandProfileSelect({
 
     if (value === NONE_VALUE) {
       onContextChange("");
+      onProfileChange?.(null);
       return;
     }
     if (value === AUTO_VALUE) {
       const defaultProfile = profiles.find((profile) => profile.isDefault);
       onContextChange(defaultProfile ? buildBrandProfileContext(defaultProfile) : "");
+      onProfileChange?.(defaultProfile ?? null);
       return;
     }
     const profile = profiles.find((p) => p.id === value);
     onContextChange(profile ? buildBrandProfileContext(profile) : "");
+    onProfileChange?.(profile ?? null);
   }
 
   if (!loaded || profiles.length === 0) return null;

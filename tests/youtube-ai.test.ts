@@ -154,10 +154,14 @@ describe("persistence: the shared save action never trusts client-supplied metad
 });
 
 describe("no Sidebar, guest, or admin surface was touched by this phase", () => {
-  it("projectNavGroups gained no new items beyond the later Workspace IA/Prompt Library/AI Templates/Brand Kits/AI Workflows links — YouTube tools are reached only through the AI Center hub", () => {
+  it("projectNavGroups gained no new items beyond later phases' additions (Workspace IA/Prompt Library/AI Templates/Brand Kits/AI Workflows/Campaign Studio/Publishing Hub/Marketing Brain/AI Agent Studio/Knowledge Base/Performance Intelligence/AI Agent Governance/Google Integrations Hub/Customer Support Agent) — YouTube tools are reached only through the AI Center hub", () => {
     const allLabels = projectNavGroups.flatMap((g) => g.items.map((i) => i.label));
     expect(allLabels).toEqual([
       "Dashboard",
+      "Marketing Brain",
+      "AI Agents",
+      "Gobernanza de agentes",
+      "Knowledge Base",
       "Chat IA",
       "AI Center",
       "Workspace IA",
@@ -175,13 +179,19 @@ describe("no Sidebar, guest, or admin surface was touched by this phase", () => 
       "Analizador de publicaciones",
       "Calendario",
       "Campañas",
+      "Campaign Studio",
+      "Publishing Hub",
       "Respuestas",
       "Colaboraciones",
       "Monitoreo",
       "Enlaces",
-      "Automatizaciones",
+      "Automation Center",
+      "Performance Intelligence",
+      "Integraciones",
+      "Google (Analytics/Search Console)",
       "WordPress",
       "GitHub",
+      "Servicio al cliente",
       "Kit de marca",
       "Analíticas",
       "Configuración",

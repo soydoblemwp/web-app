@@ -12,46 +12,20 @@
  * tools only ever produce reasoned suggestions, never fabricated metrics.
  */
 
-const NO_REAL_METRICS_RULE =
-  "No tienes acceso a Google Search Console, herramientas de keywords ni analítica real. Nunca inventes volumen de búsqueda, dificultad de palabra clave, posición en Google ni tráfico orgánico como si fueran datos reales — si esa información sería útil, dilo explícitamente y trabaja solo con lo que el usuario te proporciona.";
+export { NO_REAL_METRICS_RULE } from "@/lib/ai-capabilities/shared-rules";
+import { NO_REAL_METRICS_RULE } from "@/lib/ai-capabilities/shared-rules";
 
-export function buildSeoTitleSystemPrompt(context: string): string {
-  return [
-    "Eres el generador de títulos SEO de AI Content Hub.",
-    "Cada título debe incluir la palabra clave objetivo de forma natural y no superar los 60 caracteres para no cortarse en los resultados de Google.",
-    "Prioriza claridad y valor real para quien busca, nunca clickbait vacío.",
-    "Devuelve únicamente una lista numerada de opciones de título, una por línea, sin explicaciones adicionales.",
-    "",
-    context,
-  ].join("\n");
-}
-
-export function buildSeoTitlePrompt(values: { tema: string; palabraClave: string; idioma: string; cantidad: string }): string {
-  return [
-    `Genera ${values.cantidad} títulos SEO sobre: ${values.tema}.`,
-    `Palabra clave objetivo: ${values.palabraClave}.`,
-    `Idioma: ${values.idioma}.`,
-  ].join("\n");
-}
-
-export function buildMetaDescriptionSystemPrompt(context: string): string {
-  return [
-    "Eres el generador de meta descripciones de AI Content Hub.",
-    "Cada meta descripción debe tener entre 140 y 160 caracteres, incluir la palabra clave objetivo de forma natural y terminar con un motivo claro para hacer clic.",
-    "No inventes ofertas, cifras ni datos que no se puedan verificar.",
-    "Devuelve únicamente una lista numerada de opciones de meta descripción, una por línea, sin explicaciones adicionales.",
-    "",
-    context,
-  ].join("\n");
-}
-
-export function buildMetaDescriptionPrompt(values: { tema: string; palabraClave: string; idioma: string; cantidad: string }): string {
-  return [
-    `Genera ${values.cantidad} meta descripciones para una página sobre: ${values.tema}.`,
-    `Palabra clave objetivo: ${values.palabraClave}.`,
-    `Idioma: ${values.idioma}.`,
-  ].join("\n");
-}
+// Fase 41 correction: the title and meta-description generators below are no
+// longer independent copies — they re-export the shared "seo-titles"/
+// "seo-meta-description" capability cores under `src/lib/ai-capabilities/*`,
+// which the public `/herramientas/generador-titulos-meta-descripciones` tool
+// calls too. The re-export keeps every name this file already exported (and
+// thus this file's own AiToolDefinition wiring below) completely unchanged.
+export { buildSeoTitlesSystemPrompt as buildSeoTitleSystemPrompt, buildSeoTitlesPrompt as buildSeoTitlePrompt } from "@/lib/ai-capabilities/seo-titles/prompt";
+export {
+  buildSeoMetaDescriptionSystemPrompt as buildMetaDescriptionSystemPrompt,
+  buildSeoMetaDescriptionPrompt as buildMetaDescriptionPrompt,
+} from "@/lib/ai-capabilities/seo-meta-description/prompt";
 
 export function buildKeywordResearchSystemPrompt(context: string): string {
   return [

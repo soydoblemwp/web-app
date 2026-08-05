@@ -484,7 +484,7 @@ describe("Security: ownership verified through the entire SubWorkflow chain, nev
 
   it("the frozen revision is re-verified (userId AND workflowId) at the moment the child run is actually created — never blindly trusted from the snapshot alone", () => {
     const fn = actions.match(/if \(resolution\.kind === "sub_workflow"\) \{[\s\S]*?\n  \}\n\n  const completed/)![0];
-    expect(fn).toMatch(/childRevision\.userId !== user\.id \|\| childRevision\.workflowId !== childWorkflowId/);
+    expect(fn).toMatch(/childRevision\.userId !== userId \|\| childRevision\.workflowId !== childWorkflowId/);
   });
 
   it("createRunFromSnapshot's new parentRunId/parentStepRunId/depth parameters are only ever supplied by prepareWorkflowStepAction's own server-side sub_workflow branch — never accepted from any client-facing action input", () => {
@@ -504,16 +504,26 @@ describe("Security: ownership verified through the entire SubWorkflow chain, nev
   });
 
   it("every new/modified exported action in workflow-execution.ts and workflow-lifecycle.ts still calls requireProjectAccess before touching data", () => {
+    // beginFreshRun/prepareWorkflowStepCore/cancelWorkflowRunCore (Fase 33) are
+    // an intentional, documented exception: real, reusable cores that take an
+    // already-resolved userId instead of a session, so Automation Center's
+    // scheduler/webhook/event-triggered runs (which have no HTTP session) can
+    // call the SAME execution engine — never a duplicate. Every actual session
+    // check still happens exactly once, in the thin exported *Action wrapper
+    // that calls each of these before delegating.
+    const SESSION_FREE_CORE_FUNCTIONS = ["beginFreshRun", "prepareWorkflowStepCore", "cancelWorkflowRunCore"];
     for (const relativePath of ["src/server/actions/workflow-execution.ts", "src/server/actions/workflow-lifecycle.ts"]) {
       const source = read(relativePath);
-      const fns = source.match(/export async function \w+\([\s\S]*?\n\}/g) ?? [];
+      const fns = (source.match(/export async function \w+\([\s\S]*?\n\}/g) ?? []).filter(
+        (fn) => !SESSION_FREE_CORE_FUNCTIONS.some((name) => fn.startsWith(`export async function ${name}(`))
+      );
       expect(fns.length).toBeGreaterThan(5);
       for (const fn of fns) expect(fn).toMatch(/requireProjectAccess\(/);
     }
   });
 
   it("resumeOrCreateChildRun never accepts a client-supplied leaseOwner for a child run — always server-generated (randomUUID), since no real browser tab drives a child run independently", () => {
-    const fn = actions.match(/async function resumeOrCreateChildRun[\s\S]*?\n(?=async function beginFreshRun)/)![0];
+    const fn = actions.match(/async function resumeOrCreateChildRun[\s\S]*?\n(?=export async function beginFreshRun)/)![0];
     expect(fn).toMatch(/leaseOwner: randomUUID\(\)/);
   });
 });

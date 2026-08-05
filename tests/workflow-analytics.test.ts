@@ -352,7 +352,7 @@ describe("Duration and normalized-error persistence on real terminal transitions
   });
 
   it("cancelWorkflowRunAction persists durationMs and a 'cancelled' normalizedErrorCode on both the run and any in-flight step", () => {
-    const fn = actions.match(/export async function cancelWorkflowRunAction[\s\S]*?\n\}/)![0];
+    const fn = actions.match(/export async function cancelWorkflowRunCore[\s\S]*?\n\}/)![0];
     expect(fn).toMatch(/normalizedErrorCode: "cancelled",/);
     expect(fn).toMatch(/durationMs: runDurationMs,/);
   });

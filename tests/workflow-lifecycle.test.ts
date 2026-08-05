@@ -397,7 +397,7 @@ describe("Execution modes: published reads the active revision, draft_test reads
   });
 
   it("createRunFromSnapshot persists workflowRevisionId and a sourceDefinitionHash computed server-side from the snapshot's own fields", () => {
-    const fn = actions.match(/async function createRunFromSnapshot[\s\S]*?\n(?=async function beginFreshRun)/)![0];
+    const fn = actions.match(/async function createRunFromSnapshot[\s\S]*?\n(?=export async function beginFreshRun)/)![0];
     expect(fn).toMatch(/const sourceDefinitionHash = computeDefinitionHash\(/);
     expect(fn).toMatch(/workflowRevisionId: params\.snapshot\.revisionId,/);
     expect(fn).toMatch(/sourceDefinitionHash,/);
@@ -489,13 +489,27 @@ describe("Schema: WorkflowRevision + Workflow/WorkflowRun lifecycle fields are a
     expect(model).toMatch(/sourceDefinitionHash\s+String\?/);
   });
 
-  it("no second Workflow-like or WorkflowRun-like EXECUTION table was introduced (WorkflowDependency, added by the composability phase, is a small indexed edge-list — not a duplicated core entity; see tests/workflow-composability.test.ts)", () => {
+  it("no second Workflow-like or WorkflowRun-like EXECUTION table was introduced (WorkflowDependency, added by the composability phase, is a small indexed edge-list — not a duplicated core entity; the WorkflowAutomation* models added by the Automation Center phase are an orchestration/scheduling layer that drives the SAME WorkflowRun/WorkflowStepRun engine — see tests/workflow-composability.test.ts and tests/automations.test.ts)", () => {
     expect(schema.match(/^model \w*Workflow\w* \{/gm)).toEqual([
       "model Workflow {",
       "model WorkflowDependency {",
       "model WorkflowRevision {",
       "model WorkflowRun {",
       "model WorkflowStepRun {",
+      "model WorkflowAutomation {",
+      "model WorkflowAutomationTrigger {",
+      "model WorkflowAutomationConditionGroup {",
+      "model WorkflowAutomationCondition {",
+      "model WorkflowAutomationInputMapping {",
+      "model WorkflowAutomationRun {",
+      "model WorkflowAutomationRunAttempt {",
+      "model WorkflowAutomationApproval {",
+      "model WorkflowAutomationWait {",
+      "model WorkflowAutomationScheduleException {",
+      "model WorkflowAutomationWebhookDelivery {",
+      "model WorkflowAutomationEvent {",
+      "model WorkflowAutomationEventDelivery {",
+      "model WorkflowAutomationNotificationState {",
     ]);
   });
 });

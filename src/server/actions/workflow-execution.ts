@@ -49,6 +49,39 @@ type RunWithSteps = NonNullable<Awaited<ReturnType<typeof getWorkflowRunForUser>
 
 const INTERRUPTION_REASON = "Se perdió la conexión con el navegador que controlaba esta ejecución.";
 
+/**
+ * Publishes workflow_run.completed/failed for EVERY terminal WorkflowRun —
+ * whether started normally from the UI or by the Automation Center's own
+ * bridge (src/server/services/automation-workflow-bridge.ts) — so other
+ * automations can react to any workflow's completion, not just ones an
+ * automation itself started (spec section 8/40). A dynamic import avoids a
+ * top-level circular import: automation-workflow-bridge.ts itself imports
+ * beginFreshRun/prepareWorkflowStepCore/cancelWorkflowRunCore from this
+ * file, so this reference must stay deferred to call time. The bridge's own
+ * idempotencyKey for these two events is identical
+ * (`workflow_run.completed:${id}` / `workflow_run.failed:${id}`), so when a
+ * run WAS automation-driven, this call safely no-ops against the row the
+ * bridge already inserted — never a duplicate.
+ */
+async function notifyWorkflowRunTerminal(run: RunWithSteps, status: "COMPLETED" | "FAILED") {
+  const { publishAutomationEvent } = await import("@/server/services/automation-events");
+  // When this WorkflowRun was itself started by an AutomationRun, carry its causation/correlation/chainDepth forward so loop detection can trace the full ancestry (spec section 31) — a manually-started run has no such row, and the fields stay unset.
+  const drivingAutomationRun = await prisma.workflowAutomationRun.findUnique({
+    where: { workflowRunId: run.id },
+    select: { id: true, correlationId: true, chainDepth: true },
+  });
+  await publishAutomationEvent({
+    projectId: run.projectId,
+    eventKey: status === "COMPLETED" ? "workflow_run.completed" : "workflow_run.failed",
+    resourceId: run.id,
+    payload: { id: run.id, workflowId: run.workflowId, status },
+    idempotencyKey: `workflow_run.${status === "COMPLETED" ? "completed" : "failed"}:${run.id}`,
+    causationAutomationRunId: drivingAutomationRun?.id ?? null,
+    correlationId: drivingAutomationRun?.correlationId ?? null,
+    chainDepth: drivingAutomationRun ? drivingAutomationRun.chainDepth + 1 : undefined,
+  });
+}
+
 function workflowsPath(projectId: string) {
   return `/dashboard/${projectId}/ai-workflows`;
 }
@@ -112,6 +145,7 @@ async function failRunAndRemainingSteps(run: RunWithSteps, failedStepRunId: stri
       data: { status: "SKIPPED" },
     }),
   ]);
+  await notifyWorkflowRunTerminal(run, "FAILED");
 }
 
 async function completeStepAndMaybeRun(run: RunWithSteps, stepIndex: number, rawOutput: string) {
@@ -142,6 +176,7 @@ async function completeStepAndMaybeRun(run: RunWithSteps, stepIndex: number, raw
         leaseExpiresAt: null,
       },
     });
+    await notifyWorkflowRunTerminal(run, "COMPLETED");
   } else {
     // A completed step is activity — extend the lease so the next step's prepare call isn't rejected as abandoned.
     await prisma.workflowRun.update({ where: { id: run.id }, data: { leaseExpiresAt: nextLeaseExpiry(now), lastHeartbeatAt: now } });
@@ -396,7 +431,16 @@ async function resumeOrCreateChildRun(params: {
   };
 }
 
-async function beginFreshRun(params: {
+/**
+ * The real, reusable core of "start a workflow run" — takes an
+ * already-resolved userId rather than reading a session, so it's callable
+ * both from the normal session-based actions below AND from server-side
+ * callers with no HTTP session at all (Automation Center's scheduler/event/
+ * webhook-triggered runs — see src/server/services/automation-workflow-bridge.ts).
+ * Exported for exactly that reuse; every actual session/permission check
+ * still happens once, in each thin action below, before this is ever called.
+ */
+export async function beginFreshRun(params: {
   userId: string;
   projectId: string;
   workflowId: string;
@@ -570,8 +614,12 @@ export interface PrepareWorkflowStepState {
 
 export async function prepareWorkflowStepAction(input: PrepareWorkflowStepInput): Promise<PrepareWorkflowStepState> {
   const user = await requireProjectAccess(input.projectId, "VIEWER");
+  return prepareWorkflowStepCore(user.id, input);
+}
 
-  const run = await getWorkflowRunForUser(input.runId, user.id);
+/** Real core reused by Automation Center's headless step driver (see beginFreshRun's comment above) — identical logic to the session-based action, just parametrized by an already-resolved userId. */
+export async function prepareWorkflowStepCore(userId: string, input: PrepareWorkflowStepInput): Promise<PrepareWorkflowStepState> {
+  const run = await getWorkflowRunForUser(input.runId, userId);
   if (!run || run.projectId !== input.projectId) return { error: "Ejecución no encontrada." };
 
   const now = new Date();
@@ -609,15 +657,15 @@ export async function prepareWorkflowStepAction(input: PrepareWorkflowStepInput)
   } else {
     // Legacy run created before snapshots existed (Phase 21) — fall back to
     // a live lookup, exactly as before, for backward compatibility only.
-    const workflow = await getWorkflowForUser(run.workflowId, user.id);
+    const workflow = await getWorkflowForUser(run.workflowId, userId);
     if (!workflow) return { error: "Workflow no encontrado." };
     step = workflow.steps[input.stepIndex];
     if (!step || step.id !== stepRow.stepId) {
       await failRunAndRemainingSteps(run, stepRow.id, "El workflow cambió desde que se inició esta ejecución.");
       return { error: "El workflow cambió desde que se inició esta ejecución." };
     }
-    const brandContext = await buildAiToolBrandContext(input.projectId, user.id);
-    resources = await buildResourcesForStep(step, user.id, input.projectId, brandContext);
+    const brandContext = await buildAiToolBrandContext(input.projectId, userId);
+    resources = await buildResourcesForStep(step, userId, input.projectId, brandContext);
   }
 
   if (!step || step.id !== stepRow.stepId) {
@@ -696,7 +744,7 @@ export async function prepareWorkflowStepAction(input: PrepareWorkflowStepInput)
     }
 
     const childRevision = await prisma.workflowRevision.findUnique({ where: { id: childRevisionId } });
-    if (!childRevision || childRevision.userId !== user.id || childRevision.workflowId !== childWorkflowId) {
+    if (!childRevision || childRevision.userId !== userId || childRevision.workflowId !== childWorkflowId) {
       const message = "El workflow hijo de este paso ya no está disponible.";
       await failRunAndRemainingSteps(run, stepRow.id, message);
       return { error: message };
@@ -715,7 +763,7 @@ export async function prepareWorkflowStepAction(input: PrepareWorkflowStepInput)
         variables: childDefinition.variables,
         steps: childDefinition.steps,
       },
-      user.id,
+      userId,
       input.projectId
     );
     if ("error" in childSnapshot) {
@@ -731,7 +779,7 @@ export async function prepareWorkflowStepAction(input: PrepareWorkflowStepInput)
     const childRun = await resumeOrCreateChildRun({
       parentRunId: run.id,
       parentStepRunId: stepRow.id,
-      userId: user.id,
+      userId,
       projectId: input.projectId,
       childWorkflowId,
       childSnapshot,
@@ -1050,8 +1098,12 @@ export async function resumeWorkflowRunAction(input: ResumeWorkflowRunInput): Pr
 
 export async function cancelWorkflowRunAction(projectId: string, runId: string): Promise<{ error?: string }> {
   const user = await requireProjectAccess(projectId, "VIEWER");
+  return cancelWorkflowRunCore(user.id, projectId, runId);
+}
 
-  const run = await getWorkflowRunForUser(runId, user.id);
+/** Real core reused by Automation Center (e.g. cancelling the WorkflowRun behind a cancelled/timed-out AutomationRun) — identical logic, parametrized by an already-resolved userId. */
+export async function cancelWorkflowRunCore(userId: string, projectId: string, runId: string): Promise<{ error?: string }> {
+  const run = await getWorkflowRunForUser(runId, userId);
   if (!run) return { error: "Ejecución no encontrada." };
   if (isRunTerminal(run.status)) return {}; // already finished — nothing to cancel, not an error
 

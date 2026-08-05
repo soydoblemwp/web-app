@@ -24,3 +24,10 @@ export class ForbiddenError extends Error {
     super(message);
   }
 }
+
+/** Thrown by requireUser() for a real, authenticated session whose account has not completed email verification — distinct from ForbiddenError (wrong role/no access) and UnauthorizedError (no session at all), so callers can redirect to /verify-email specifically instead of showing a generic access-denied outcome. */
+export class EmailNotVerifiedError extends ForbiddenError {
+  constructor(message = "Debes verificar tu correo antes de continuar.") {
+    super(message);
+  }
+}

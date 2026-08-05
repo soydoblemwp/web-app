@@ -34,6 +34,15 @@ import {
   LayoutTemplate,
   Fingerprint,
   Waypoints,
+  Rocket,
+  Send,
+  BrainCircuit,
+  BrainCog,
+  Zap,
+  Gauge,
+  Plug,
+  TrendingUp,
+  LifeBuoy,
 } from "lucide-react";
 
 export interface NavItem {
@@ -52,6 +61,10 @@ export const projectNavGroups: NavGroup[] = [
     label: "Principal",
     items: [
       { label: "Dashboard", segment: "", icon: LayoutDashboard },
+      { label: "Marketing Brain", segment: "marketing-brain", icon: BrainCircuit },
+      { label: "AI Agents", segment: "agents", icon: Bot },
+      { label: "Gobernanza de agentes", segment: "agents/governance", icon: ShieldCheck },
+      { label: "Knowledge Base", segment: "knowledge", icon: BrainCog },
       { label: "Chat IA", segment: "chat", icon: MessageCircle },
       { label: "AI Center", segment: "ai-center", icon: LayoutGrid },
       { label: "Workspace IA", segment: "workspace", icon: Layers },
@@ -79,6 +92,8 @@ export const projectNavGroups: NavGroup[] = [
       { label: "Analizador de publicaciones", segment: "social/analyzer", icon: ClipboardCheck },
       { label: "Calendario", segment: "calendar", icon: CalendarDays },
       { label: "Campañas", segment: "campaigns", icon: Megaphone },
+      { label: "Campaign Studio", segment: "campaign-studio", icon: Rocket },
+      { label: "Publishing Hub", segment: "publishing", icon: Send },
       { label: "Respuestas", segment: "replies", icon: MessageSquareReply },
     ],
   },
@@ -88,15 +103,22 @@ export const projectNavGroups: NavGroup[] = [
       { label: "Colaboraciones", segment: "collaborations", icon: Handshake },
       { label: "Monitoreo", segment: "monitoring", icon: Radar },
       { label: "Enlaces", segment: "links", icon: Link2 },
-      { label: "Automatizaciones", segment: "automations", icon: Workflow },
+      { label: "Automation Center", segment: "automations", icon: Zap },
+      { label: "Performance Intelligence", segment: "performance", icon: Gauge },
     ],
   },
   {
     label: "Integraciones",
     items: [
+      { label: "Integraciones", segment: "integrations", icon: Plug },
+      { label: "Google (Analytics/Search Console)", segment: "integrations/google", icon: TrendingUp },
       { label: "WordPress", segment: "integrations/wordpress", icon: Globe },
       { label: "GitHub", segment: "integrations/github", icon: GitBranch },
     ],
+  },
+  {
+    label: "Soporte",
+    items: [{ label: "Servicio al cliente", segment: "customer-support", icon: LifeBuoy }],
   },
   {
     label: "Proyecto",

@@ -288,7 +288,7 @@ describe("AI Center integration: every tool gets 'Seleccionar Brand Kit', auto-f
   it("BrandProfileSelect defaults to the user's default Brand Kit automatically when nothing is explicitly chosen", () => {
     const select = read("src/components/brand-profiles/brand-profile-select.tsx");
     expect(select).toMatch(/const defaultProfile = result\.find\(\(profile\) => profile\.isDefault\)/);
-    expect(select).toMatch(/if \(defaultProfile\) onContextChange\(buildBrandProfileContext\(defaultProfile\)\)/);
+    expect(select).toMatch(/if \(defaultProfile\) \{\s*onContextChange\(buildBrandProfileContext\(defaultProfile\)\);/);
   });
 
   it("still preserves every capability previous integration tests already verified (nothing broken)", () => {

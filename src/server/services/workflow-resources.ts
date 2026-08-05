@@ -7,6 +7,7 @@ import { getSavedPromptForUser } from "@/server/services/prompt-library";
 import { getAiTemplateForUser } from "@/server/services/ai-templates";
 import { getWorkflowForUser } from "@/server/services/ai-workflows";
 import { getActiveRevisionForWorkflow, getRevisionForUser } from "@/server/services/workflow-revisions";
+import { searchKnowledge } from "@/server/services/knowledge-search";
 import type { WorkflowStep } from "@/lib/ai-workflows/engine";
 import type { ExecutionResourceContext } from "@/lib/ai-workflows/execution-resolver";
 import type { WorkflowSnapshot } from "@/lib/ai-workflows/snapshot";
@@ -104,12 +105,83 @@ export async function buildResourcesForStep(
       };
     }
 
+    case "knowledge": {
+      if (!step.knowledgeQuery?.trim()) return { error: "Falta la consulta de búsqueda de Knowledge Base de este paso." };
+      if (!step.knowledgeCollectionIds?.length && !step.knowledgeSourceIds?.length) {
+        return { error: "Este paso de Knowledge Base no tiene ninguna colección ni fuente seleccionada." };
+      }
+      const hits = await searchKnowledge({
+        projectId,
+        query: step.knowledgeQuery,
+        collectionIds: step.knowledgeCollectionIds,
+        sourceIds: step.knowledgeSourceIds,
+        limit: 6,
+      });
+      const knowledgeSearchResult =
+        hits.length > 0
+          ? hits.map((h, i) => `[${i + 1}] (${h.sourceTitle}${h.locationLabel ? ` — ${h.locationLabel}` : ""}): ${h.snippet}`).join("\n\n")
+          : "No se encontraron fragmentos relevantes en Knowledge Base para esta consulta.";
+      return { brandContext, knowledgeSearchResult };
+    }
+
+    case "performance": {
+      const performanceResult = await resolvePerformanceStepResult(step, projectId);
+      if ("error" in performanceResult) return performanceResult;
+      return { brandContext, performanceResult: performanceResult.text };
+    }
+
     case "ai_tool":
+    case "agent":
     case "transform":
     case "save_result":
     default:
       return { brandContext };
   }
+}
+
+/** Real, read-only Performance Intelligence lookups for the "performance" workflow node (Fase 34 adapter) — resolved once at snapshot-build time, exactly like the "knowledge" step's search call above. Never writes anything (spec section 36: "no permitas registrar métricas falsas desde un workflow sin origen declarado" — this engine offers no write node at all, precisely to avoid that risk). */
+async function resolvePerformanceStepResult(step: WorkflowStep, projectId: string): Promise<{ text: string } | { error: string }> {
+  const { getInternalMetricsSnapshot } = await import("@/server/services/performance-internal-metrics");
+  const { compareContentItems, compareCampaigns, compareSocialPosts } = await import("@/server/services/performance-comparisons");
+  const { listRecommendations } = await import("@/server/services/performance-recommendations");
+  const { getExperimentDetail } = await import("@/server/services/performance-experiments");
+
+  const periodEnd = new Date();
+  const periodStart = new Date(periodEnd.getTime() - (step.performancePeriodDays ?? 30) * 86_400_000);
+
+  if (step.performanceOperation === "query") {
+    const snapshot = await getInternalMetricsSnapshot(projectId, { start: periodStart, end: periodEnd });
+    return { text: JSON.stringify(snapshot) };
+  }
+
+  if (step.performanceOperation === "compare") {
+    if (!step.performanceResourceId || !step.performanceCompareResourceIds?.length) return { error: "Este paso de comparación no tiene recursos configurados." };
+    const ids = [step.performanceResourceId, ...step.performanceCompareResourceIds];
+    const metricKeys = step.performanceMetricKeys ?? [];
+    const resourceType = step.performanceResourceType ?? "CONTENT_ITEM";
+    const result =
+      resourceType === "CAMPAIGN"
+        ? await compareCampaigns(projectId, ids, metricKeys, periodStart, periodEnd)
+        : resourceType === "SOCIAL_POST"
+          ? await compareSocialPosts(projectId, ids, metricKeys, periodStart, periodEnd)
+          : await compareContentItems(projectId, ids, metricKeys, periodStart, periodEnd);
+    if ("error" in result) return { error: result.error };
+    return { text: JSON.stringify(result) };
+  }
+
+  if (step.performanceOperation === "recommend") {
+    const recommendations = await listRecommendations(projectId, { status: "NEW", limit: 20 });
+    return { text: JSON.stringify(recommendations.map((r) => ({ id: r.id, title: r.title, category: r.category, priority: r.priority, actionProposed: r.actionProposed }))) };
+  }
+
+  if (step.performanceOperation === "experiment_result") {
+    if (!step.performanceExperimentId) return { error: "Falta el experimento de este paso." };
+    const experiment = await getExperimentDetail(projectId, step.performanceExperimentId);
+    if (!experiment) return { error: "El experimento de este paso no existe o no pertenece a este proyecto." };
+    return { text: JSON.stringify({ id: experiment.id, name: experiment.name, status: experiment.status, conclusion: experiment.conclusion, winnerVariantId: experiment.winnerVariantId }) };
+  }
+
+  return { error: "Este paso de Performance Intelligence no tiene una operación configurada." };
 }
 
 export interface WorkflowSnapshotSource {

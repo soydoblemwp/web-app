@@ -13,11 +13,12 @@ import {
   format,
 } from "date-fns";
 import { es } from "date-fns/locale";
-import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, Zap } from "lucide-react";
 import { prisma } from "@/lib/db/prisma";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { listUpcomingOccurrencesAction } from "@/server/actions/automation-runs";
 
 export const metadata: Metadata = { title: "Calendario" };
 
@@ -58,6 +59,16 @@ export default async function CalendarPage({
     orderBy: { createdAt: "desc" },
     take: 10,
   });
+
+  // Bounded (never an unbounded/infinite copy of the recurrence — spec section 34) window of upcoming automation occurrences, only computed when the visible grid reaches into the future.
+  const daysUntilGridEnd = Math.ceil((gridEnd.getTime() - new Date().getTime()) / 86_400_000) + 1;
+  const automationOccurrences = daysUntilGridEnd > 0 ? await listUpcomingOccurrencesAction(projectId, Math.min(daysUntilGridEnd, 90)) : [];
+  const automationsByDay = new Map<string, typeof automationOccurrences>();
+  for (const occurrence of automationOccurrences) {
+    if (occurrence.occurrenceAt < gridStart || occurrence.occurrenceAt > gridEnd) continue;
+    const key = format(occurrence.occurrenceAt, "yyyy-MM-dd");
+    automationsByDay.set(key, [...(automationsByDay.get(key) ?? []), occurrence]);
+  }
 
   return (
     <div className="space-y-6">
@@ -104,6 +115,7 @@ export default async function CalendarPage({
         {days.map((day) => {
           const key = format(day, "yyyy-MM-dd");
           const dayPosts = postsByDay.get(key) ?? [];
+          const dayAutomations = automationsByDay.get(key) ?? [];
           return (
             <div
               key={key}
@@ -126,6 +138,15 @@ export default async function CalendarPage({
                     className="block truncate rounded bg-muted px-1.5 py-0.5 text-[11px] hover:bg-muted/70"
                   >
                     {post.platform}: {post.internalTitle || post.text.slice(0, 20)}
+                  </Link>
+                ))}
+                {dayAutomations.map((occurrence, i) => (
+                  <Link
+                    key={`${occurrence.automationId}-${i}`}
+                    href={`/dashboard/${projectId}/automations/${occurrence.automationId}`}
+                    className="flex items-center gap-1 truncate rounded bg-primary/10 px-1.5 py-0.5 text-[11px] text-primary hover:bg-primary/20"
+                  >
+                    <Zap className="size-2.5 shrink-0" /> {occurrence.automationName}
                   </Link>
                 ))}
               </div>

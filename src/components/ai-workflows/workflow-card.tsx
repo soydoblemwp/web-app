@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { toast } from "sonner";
 import { Star, Play, Zap, History, GitBranch, Archive, ArchiveRestore, Rocket, Eye, Link2 } from "lucide-react";
 import {
@@ -18,6 +19,7 @@ import {
   listWorkflowsUsedByAction,
   listWorkflowsThatUseAction,
 } from "@/server/actions/workflow-lifecycle";
+import { listAutomationsForWorkflowAction } from "@/server/actions/automations";
 import type { WorkflowDependencyRow } from "@/server/services/workflow-lifecycle";
 import { parseTagsInput } from "@/lib/validation/prompt-library";
 import type { WorkflowLike } from "@/lib/ai-workflows/types";
@@ -44,6 +46,9 @@ const STEP_TYPE_LABELS: Record<WorkflowStepType, string> = {
   transform: "Transformar salida",
   save_result: "Guardar resultado",
   workflow: "Ejecutar sub-workflow",
+  agent: "Ejecutar agente de AI Agent Studio",
+  knowledge: "Buscar en Knowledge Base",
+  performance: "Consultar Performance Intelligence",
 };
 
 type WorkflowCardMode = "view" | "preview" | "execute" | "history" | "edit" | "versions" | "dependencies";
@@ -84,6 +89,7 @@ export function WorkflowCard({
   const [dependencies, setDependencies] = useState<{ usesWorkflows: WorkflowDependencyRow[]; usedByWorkflows: WorkflowDependencyRow[] } | null>(null);
   const [dependenciesLoading, setDependenciesLoading] = useState(false);
   const [archiveConfirm, setArchiveConfirm] = useState<WorkflowDependencyRow[] | null>(null);
+  const [archiveConfirmAutomations, setArchiveConfirmAutomations] = useState<{ id: string; name: string; status: string }[]>([]);
 
   // The server-fetched workflow prop only changes after a router.refresh()
   // (e.g. following a publish/restore/archive) — re-sync local editing state
@@ -144,6 +150,7 @@ export function WorkflowCard({
     const result = await archiveWorkflowAction(projectId, workflow.id);
     setBusy(false);
     setArchiveConfirm(null);
+    setArchiveConfirmAutomations([]);
     if (result.error) {
       toast.error(result.error);
       return;
@@ -152,13 +159,15 @@ export function WorkflowCard({
     router.refresh();
   }
 
-  /** Shows "quién depende de mí" BEFORE archiving, per spec — a workflow with no dependents archives immediately (no friction for the common case); one with dependents requires an explicit second confirmation, since archiving makes it stop resolving for any parent that references it. */
+  /** Shows "quién depende de mí" BEFORE archiving, per spec — a workflow with no dependents archives immediately (no friction for the common case); one with dependents (sub-workflow references OR non-archived Automation Center automations) requires an explicit second confirmation. Automation Center never moves trigger logic into the workflow engine — this is purely a visibility warning (spec section 41). */
   async function handleArchiveClick() {
     setBusy(true);
-    const dependents = await listWorkflowsThatUseAction(projectId, workflow.id);
+    const [dependents, automations] = await Promise.all([listWorkflowsThatUseAction(projectId, workflow.id), listAutomationsForWorkflowAction(projectId, workflow.id)]);
     setBusy(false);
-    if (dependents.length > 0) {
+    const activeAutomations = automations.filter((a) => a.status !== "ARCHIVED");
+    if (dependents.length > 0 || activeAutomations.length > 0) {
       setArchiveConfirm(dependents);
+      setArchiveConfirmAutomations(activeAutomations);
       return;
     }
     await doArchive();
@@ -459,22 +468,52 @@ export function WorkflowCard({
 
         {archiveConfirm ? (
           <div className="space-y-2 rounded-lg border border-amber-500/50 bg-amber-500/5 p-3 text-sm">
-            <p className="font-medium">
-              {archiveConfirm.length} workflow{archiveConfirm.length === 1 ? "" : "s"} usa{archiveConfirm.length === 1 ? "" : "n"} este como sub-workflow
-            </p>
-            <ul className="list-inside list-disc text-xs text-muted-foreground">
-              {archiveConfirm.map((w) => (
-                <li key={w.id}>{w.name}</li>
-              ))}
-            </ul>
-            <p className="text-xs text-muted-foreground">
-              Archivarlo hará que esos workflows dejen de poder ejecutarse en cuanto intenten usarlo. ¿Archivar de todas formas?
-            </p>
+            {archiveConfirm.length > 0 ? (
+              <>
+                <p className="font-medium">
+                  {archiveConfirm.length} workflow{archiveConfirm.length === 1 ? "" : "s"} usa{archiveConfirm.length === 1 ? "" : "n"} este como sub-workflow
+                </p>
+                <ul className="list-inside list-disc text-xs text-muted-foreground">
+                  {archiveConfirm.map((w) => (
+                    <li key={w.id}>{w.name}</li>
+                  ))}
+                </ul>
+                <p className="text-xs text-muted-foreground">Archivarlo hará que esos workflows dejen de poder ejecutarse en cuanto intenten usarlo.</p>
+              </>
+            ) : null}
+            {archiveConfirmAutomations.length > 0 ? (
+              <>
+                <p className="font-medium">
+                  {archiveConfirmAutomations.length} automatización{archiveConfirmAutomations.length === 1 ? "" : "es"} de Automation Center usa{archiveConfirmAutomations.length === 1 ? "" : "n"} este workflow
+                </p>
+                <ul className="list-inside list-disc text-xs text-muted-foreground">
+                  {archiveConfirmAutomations.map((a) => (
+                    <li key={a.id}>{a.name}</li>
+                  ))}
+                </ul>
+                <p className="text-xs text-muted-foreground">
+                  Esas automatizaciones no podrán activarse mientras el workflow esté archivado. Revísalas en{" "}
+                  <Link href={`/dashboard/${projectId}/automations`} className="underline">
+                    Automation Center
+                  </Link>
+                  .
+                </p>
+              </>
+            ) : null}
+            <p className="text-xs text-muted-foreground">¿Archivar de todas formas?</p>
             <div className="flex gap-2">
               <Button type="button" variant="destructive" size="sm" disabled={busy} onClick={doArchive}>
                 Archivar de todas formas
               </Button>
-              <Button type="button" variant="outline" size="sm" onClick={() => setArchiveConfirm(null)}>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setArchiveConfirm(null);
+                  setArchiveConfirmAutomations([]);
+                }}
+              >
                 Cancelar
               </Button>
             </div>

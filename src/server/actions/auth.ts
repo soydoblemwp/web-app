@@ -3,6 +3,7 @@
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/db/prisma";
 import { registerSchema } from "@/lib/validation/auth";
+import { sendVerificationEmailToUser } from "@/server/services/email-verification";
 
 export interface RegisterFormState {
   error?: string;
@@ -33,9 +34,19 @@ export async function registerUser(
 
   const passwordHash = await bcrypt.hash(password, 12);
 
-  await prisma.user.create({
+  // emailVerified stays NULL (the column's own default) — the account
+  // cannot sign in (authorize() refuses it) or reach the dashboard
+  // (proxy.ts/requireUser() refuse it) until the link below is used.
+  const user = await prisma.user.create({
     data: { name, email: normalizedEmail, passwordHash },
   });
+
+  // Never lets a delivery failure break registration — the account,
+  // password, and a real, usable token all exist regardless; the
+  // "revisa tu correo" screen's own "reenviar" action is the recovery path
+  // either way (see src/lib/email/send-email.ts for why sending currently
+  // always fails: no provider is configured yet).
+  await sendVerificationEmailToUser(user.id, user.email);
 
   return { success: true };
 }

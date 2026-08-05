@@ -137,7 +137,7 @@ describe("Immutable run snapshot: built server-side, never trusted from the clie
   it("editing a Workflow's steps after a run started never mutates that run's own frozen snapshot — the snapshot is a copy taken once, at start time, never re-read from the live Workflow row afterward", () => {
     const actions = read("src/server/actions/workflow-execution.ts");
     // createRunFromSnapshot persists `params.snapshot` (an already-resolved, in-memory object) directly — it never re-queries prisma.workflow at run-creation-completion time, so nothing written after this call can retroactively change what was stored.
-    const fn = actions.match(/async function createRunFromSnapshot[\s\S]*?\n(?=async function beginFreshRun)/)![0];
+    const fn = actions.match(/async function createRunFromSnapshot[\s\S]*?\n(?=export async function beginFreshRun)/)![0];
     expect(fn).toMatch(/workflowSnapshot: params\.snapshot as unknown as Prisma\.InputJsonValue/);
     expect(fn).not.toMatch(/prisma\.workflow\.findUnique/);
   });
@@ -341,7 +341,7 @@ describe("Lease: DB-and-timestamps only, no WebSockets/Redis/queue", () => {
 
   it("cancelling always releases the lease regardless of who holds it — it's the run owner's action, not lease-gated", () => {
     const actions = read("src/server/actions/workflow-execution.ts");
-    const fn = actions.match(/export async function cancelWorkflowRunAction[\s\S]*?\n\}/)![0];
+    const fn = actions.match(/export async function cancelWorkflowRunCore[\s\S]*?\n\}/)![0];
     expect(fn).toMatch(/leaseId: null,/);
     expect(fn).not.toMatch(/isLeaseHeldWith/);
   });
@@ -403,7 +403,7 @@ describe("Execution tokens: one per attempt, stale ones always rejected", () => 
     const resumeFn = actions.match(/export async function resumeWorkflowRunAction[\s\S]*?\n\}/)![0];
     expect(resumeFn).toMatch(/current\.steps\.find\(\(s\) => canReclaimStep\(s\.status\)\)/);
     expect(resumeFn).toMatch(/attemptNumber: \{ increment: 1 \} \}/);
-    const childResumeFn = actions.match(/async function resumeOrCreateChildRun[\s\S]*?\n(?=async function beginFreshRun)/)![0];
+    const childResumeFn = actions.match(/async function resumeOrCreateChildRun[\s\S]*?\n(?=export async function beginFreshRun)/)![0];
     expect(childResumeFn).toMatch(/current\.steps\.find\(\(s\) => canReclaimStep\(s\.status\)\)/);
     expect(childResumeFn).toMatch(/attemptNumber: \{ increment: 1 \} \}/);
     // Exactly these two sites in the whole file — never a third.
@@ -453,7 +453,7 @@ describe("Retry: default replays the frozen snapshot verbatim; current-version i
 
   it("retryOfRunId is always set on the new run, pointing at the original — traceable, never overwritten", () => {
     expect(fn).toMatch(/retryOfRunId: original\.id,/);
-    const createFn = actions.match(/async function createRunFromSnapshot[\s\S]*?\n(?=async function beginFreshRun)/)![0];
+    const createFn = actions.match(/async function createRunFromSnapshot[\s\S]*?\n(?=export async function beginFreshRun)/)![0];
     expect(createFn).toMatch(/retryOfRunId: params\.retryOfRunId,/);
   });
 
@@ -472,7 +472,7 @@ describe("Retry: default replays the frozen snapshot verbatim; current-version i
   });
 
   it("Workflow.version bump and WorkflowRun.workflowVersion are independent — retrying with the original snapshot keeps using the OLD version even if the Workflow has since been edited", () => {
-    const createFn = actions.match(/async function createRunFromSnapshot[\s\S]*?\n(?=async function beginFreshRun)/)![0];
+    const createFn = actions.match(/async function createRunFromSnapshot[\s\S]*?\n(?=export async function beginFreshRun)/)![0];
     expect(createFn).toMatch(/workflowVersion: params\.snapshot\.workflowVersion,/);
   });
 

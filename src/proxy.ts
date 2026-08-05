@@ -26,6 +26,18 @@ export default auth((req) => {
     return NextResponse.redirect(loginUrl);
   }
 
+  // Central, server-side enforcement for email verification — covers every
+  // /dashboard/* and /admin/* request regardless of which page/layout it
+  // hits, so no individual page has to repeat this check. authorize()
+  // already refuses to sign in an unverified account, so this only ever
+  // matters for a session/JWT that was minted before this feature existed;
+  // going forward it's pure defense-in-depth. Never applies to /verify-email
+  // itself (outside this matcher entirely — see config.matcher below), so
+  // there's no redirect loop.
+  if (isLoggedIn && (isDashboardRoute || isAdminRoute) && !req.auth?.user?.emailVerified) {
+    return NextResponse.redirect(new URL("/verify-email", req.nextUrl.origin));
+  }
+
   if (isAdminRoute && isLoggedIn && !ADMIN_ROLES.has(req.auth?.user?.role ?? "")) {
     return NextResponse.redirect(new URL("/dashboard", req.nextUrl.origin));
   }

@@ -1,5 +1,6 @@
 import { analyzeTemplateVariables, renderTemplate } from "@/lib/ai-templates/engine";
 import { findToolDefinition } from "@/lib/ai-center/tools/registry";
+import { findAgentDefinition } from "@/lib/agents/registry";
 
 /**
  * The AI Workflows engine: validates a workflow's step sequence (types,
@@ -23,7 +24,7 @@ import { findToolDefinition } from "@/lib/ai-center/tools/registry";
  * that flow reuses (resolveStepForExecution), never a second implementation.
  */
 
-export type WorkflowStepType = "ai_tool" | "prompt_library" | "ai_template" | "brand_kit" | "transform" | "save_result" | "workflow";
+export type WorkflowStepType = "ai_tool" | "prompt_library" | "ai_template" | "brand_kit" | "transform" | "save_result" | "workflow" | "agent" | "knowledge" | "performance";
 
 export const WORKFLOW_STEP_TYPES: WorkflowStepType[] = [
   "ai_tool",
@@ -33,6 +34,9 @@ export const WORKFLOW_STEP_TYPES: WorkflowStepType[] = [
   "transform",
   "save_result",
   "workflow",
+  "agent",
+  "knowledge",
+  "performance",
 ];
 
 /** "workflow" step only — which revision of the referenced Workflow to execute. "latest": the child's currently-active PUBLISHED revision, re-resolved (never re-published mid-run) at the moment the PARENT's own snapshot is built. "specific": always childRevisionId, frozen forever regardless of what the child publishes later. Never "draft" outside an explicit "Probar borrador" test of the PARENT itself. */
@@ -60,6 +64,10 @@ export interface WorkflowStep {
   toolSlug?: string;
   /** ai_tool step only: one {{variable}}-templated value per required/optional field the selected tool declares (AiToolDefinition.fields[].name → template string). Resolved the same way inputTemplate is for every other step type. */
   fieldInputs?: Record<string, string>;
+  /** agent step: an official AI Agent Studio agent key (src/lib/agents/registry.ts) — Fase 31's adapter. Only official (code-defined) agents can run as a workflow node; a custom agent needs DB-backed ownership resolution this pure engine can't do (same boundary ai_tool draws around the static AI Center registry vs. Prompt Library). */
+  agentRef?: string;
+  /** agent step only: one {{variable}}-templated value per required/optional input field the selected agent declares. */
+  agentFieldInputs?: Record<string, string>;
   /** prompt_library step: SavedPrompt.id. */
   promptId?: string;
   /** ai_template step: AiTemplate.id. */
@@ -81,6 +89,25 @@ export interface WorkflowStep {
   childRevisionId?: string;
   /** workflow step: child variable name → {{parent variable}}-templated value, resolved against THIS workflow's own resolved variables (workflow inputs + prior steps' outputs) exactly like every other step's templates, then passed as the child run's own inputVariables. */
   childInputMapping?: Record<string, string>;
+  /** knowledge step (Fase 32 adapter): which collections/sources this step is scoped to — an explicit, fixed selection made in the step editor, never every collection in the project (spec section 23/29: "debe recibir alcance explícito"). */
+  knowledgeCollectionIds?: string[];
+  knowledgeSourceIds?: string[];
+  /** knowledge step: the search query text. Deliberately a plain string configured in the editor, not a {{template}} — the real Postgres full-text search this resolves against needs DB access, which only happens once at snapshot-build time (see buildResourcesForStep), same boundary as prompt_library/ai_template/brand_kit. */
+  knowledgeQuery?: string;
+  /** performance step (Fase 34 adapter): which read-only Performance Intelligence operation this node runs — query (internal metrics snapshot), compare (content/campaign/social comparison), recommend (pending recommendations), or experiment_result (an experiment's own analysis/conclusion). Never a write — registering a metric from inside a workflow isn't offered as a node, since this engine's resources are frozen once at run-start, before the write's step would actually be reached. */
+  performanceOperation?: "query" | "compare" | "recommend" | "experiment_result";
+  /** performance step: which kind of resource the operation scopes to. */
+  performanceResourceType?: "PROJECT" | "CAMPAIGN" | "CONTENT_ITEM" | "SOCIAL_POST";
+  /** performance step: the specific resource id, when performanceResourceType isn't PROJECT — a plain id configured in the editor (ownership re-verified at snapshot-build time), not a {{template}}, same boundary as knowledgeCollectionIds. */
+  performanceResourceId?: string;
+  /** performance step: for "compare", the additional resource ids to compare against performanceResourceId. */
+  performanceCompareResourceIds?: string[];
+  /** performance step: metric keys the operation reads (query/compare). */
+  performanceMetricKeys?: string[];
+  /** performance step: for "query"/"compare", how many trailing days to read (a relative window resolved fresh at snapshot-build time — never a fixed absolute date baked into the workflow definition). */
+  performancePeriodDays?: number;
+  /** performance step, "experiment_result" only: PerformanceExperiment.id. */
+  performanceExperimentId?: string;
 }
 
 export interface WorkflowValidationIssue {
@@ -97,7 +124,8 @@ export interface WorkflowValidationIssue {
     | "circular_reference"
     | "tool_not_found"
     | "missing_field_input"
-    | "invalid_child_revision_mode";
+    | "invalid_child_revision_mode"
+    | "agent_not_found";
   message: string;
 }
 
@@ -108,6 +136,7 @@ function stepTemplateStrings(step: WorkflowStep): string[] {
   const strings: string[] = [];
   if (step.inputTemplate) strings.push(step.inputTemplate);
   if (step.fieldInputs) strings.push(...Object.values(step.fieldInputs));
+  if (step.agentFieldInputs) strings.push(...Object.values(step.agentFieldInputs));
   if (step.childInputMapping) strings.push(...Object.values(step.childInputMapping));
   return strings;
 }
@@ -260,6 +289,36 @@ export function validateWorkflowSteps(steps: WorkflowStep[]): WorkflowValidation
             }
           }
         }
+      }
+    }
+    if (step.type === "agent") {
+      if (!step.agentRef) {
+        issues.push({ stepId: step.id, code: "missing_reference", message: `Falta el agente de AI Agent Studio en el paso "${step.label}".` });
+      } else if (!findAgentDefinition(step.agentRef)) {
+        issues.push({
+          stepId: step.id,
+          code: "agent_not_found",
+          message: `El agente "${step.agentRef}" del paso "${step.label}" no es un agente oficial de AI Agent Studio. Solo los agentes oficiales pueden usarse como nodo de workflow.`,
+        });
+      }
+    }
+    if (step.type === "knowledge") {
+      if (!step.knowledgeQuery?.trim()) {
+        issues.push({ stepId: step.id, code: "missing_reference", message: `Falta la consulta de búsqueda de Knowledge Base en el paso "${step.label}".` });
+      }
+      if (!step.knowledgeCollectionIds?.length && !step.knowledgeSourceIds?.length) {
+        issues.push({ stepId: step.id, code: "missing_reference", message: `Selecciona al menos una colección o fuente de Knowledge Base en el paso "${step.label}".` });
+      }
+    }
+    if (step.type === "performance") {
+      if (!step.performanceOperation) {
+        issues.push({ stepId: step.id, code: "missing_reference", message: `Falta la operación de Performance Intelligence en el paso "${step.label}".` });
+      } else if (step.performanceOperation === "experiment_result" && !step.performanceExperimentId) {
+        issues.push({ stepId: step.id, code: "missing_reference", message: `Falta el experimento en el paso "${step.label}".` });
+      } else if (step.performanceOperation === "compare" && (!step.performanceResourceId || !step.performanceCompareResourceIds?.length)) {
+        issues.push({ stepId: step.id, code: "missing_reference", message: `Selecciona al menos dos recursos para comparar en el paso "${step.label}".` });
+      } else if ((step.performanceOperation === "query" || step.performanceOperation === "compare") && !step.performanceMetricKeys?.length) {
+        issues.push({ stepId: step.id, code: "missing_reference", message: `Selecciona al menos una métrica en el paso "${step.label}".` });
       }
     }
     if (step.type === "prompt_library" && !step.promptId) {
@@ -475,6 +534,12 @@ function describeSimulatedOutput(step: WorkflowStep, resolvedInput: string, refL
       return resolvedInput;
     case "workflow":
       return `[Simulado] Se ejecutaría el workflow "${refLabel ?? step.childWorkflowId}" como sub-workflow y se usaría su resultado final.`;
+    case "agent":
+      return `[Simulado] El agente "${refLabel ?? step.agentRef ?? "agente"}" de AI Agent Studio generaría contenido a partir de: ${resolvedInput}`;
+    case "knowledge":
+      return `[Simulado] Se buscaría "${step.knowledgeQuery ?? ""}" en Knowledge Base y se devolverían los fragmentos más relevantes con sus citas.`;
+    case "performance":
+      return `[Simulado] Se consultaría Performance Intelligence (${step.performanceOperation ?? "operación"}) y se devolvería un resumen real de métricas/recomendaciones/experimento.`;
   }
 }
 
@@ -504,7 +569,7 @@ export function planWorkflowRun(
 
   for (const step of steps) {
     const { output: resolvedInput, missing } = renderTemplate(step.inputTemplate ?? "", resolvedVariables);
-    const refId = step.toolSlug ?? step.promptId ?? step.templateId ?? step.brandProfileId ?? step.childWorkflowId;
+    const refId = step.toolSlug ?? step.promptId ?? step.templateId ?? step.brandProfileId ?? step.childWorkflowId ?? step.agentRef;
     const simulatedOutput = describeSimulatedOutput(step, resolvedInput, refId ? referenceLabels[refId] : undefined);
 
     resolvedVariables[step.outputVariable] = simulatedOutput;

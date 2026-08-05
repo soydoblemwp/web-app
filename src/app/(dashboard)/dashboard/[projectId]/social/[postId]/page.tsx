@@ -1,7 +1,9 @@
 import { notFound } from "next/navigation";
+import Link from "next/link";
 import type { Metadata } from "next";
-import { Copy, Trash2 } from "lucide-react";
+import { Copy, Trash2, LineChart } from "lucide-react";
 import { getSocialPost } from "@/server/services/social";
+import { listMetricRecordsAction } from "@/server/actions/performance-metrics";
 import {
   updateSocialPostAction,
   duplicateSocialPostAction,
@@ -26,6 +28,8 @@ export default async function SocialPostDetailPage({
   const { projectId, postId } = await params;
   const post = await getSocialPost(postId);
   if (!post || post.projectId !== projectId) notFound();
+
+  const performanceRecords = await listMetricRecordsAction(projectId, { socialPostId: post.id, limit: 1 });
 
   const saveAction = updateSocialPostAction.bind(null, projectId);
 
@@ -60,6 +64,16 @@ export default async function SocialPostDetailPage({
         <Label className="text-sm">Estado</Label>
         <SocialPostStatusSelect projectId={projectId} postId={post.id} status={post.status} />
       </div>
+
+      <Link
+        href={`/dashboard/${projectId}/performance/social`}
+        className="flex items-center justify-between gap-2 rounded-lg border border-dashed p-2.5 text-xs text-muted-foreground hover:bg-accent/50"
+      >
+        <span className="flex items-center gap-1.5">
+          <LineChart className="size-3.5" /> Performance Intelligence
+        </span>
+        <span>{performanceRecords.length > 0 ? "Con datos registrados" : "Sin datos todavía"} — abrir Performance Center</span>
+      </Link>
 
       <form action={saveAction} className="space-y-4">
         <input type="hidden" name="id" value={post.id} />

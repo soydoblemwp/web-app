@@ -3,11 +3,15 @@
 import { useEffect, useState } from "react";
 import { ArrowDown, ArrowUp, Trash2 } from "lucide-react";
 import { listToolDefinitions, findToolDefinition } from "@/lib/ai-center/tools/registry";
+import { listAgentDefinitions, findAgentDefinition } from "@/lib/agents/registry";
 import { listSavedPromptsForSelectAction } from "@/server/actions/prompt-library";
 import { listAiTemplatesForSelectAction } from "@/server/actions/ai-templates";
 import { listBrandProfilesForSelectAction } from "@/server/actions/brand-profiles";
 import { listWorkflowsForSelectAction } from "@/server/actions/ai-workflows";
 import { listWorkflowRevisionsAction } from "@/server/actions/workflow-lifecycle";
+import { listCollectionsForSelectAction, listSourcesForSelectAction } from "@/server/actions/knowledge-select";
+import { listContentItemsForSelectAction, listCampaignsForSelectAction, listSocialPostsForSelectAction, listMetricCatalogAction } from "@/server/actions/performance-select";
+import { listExperimentsAction } from "@/server/actions/performance-experiments";
 import { validateWorkflowSteps, WORKFLOW_STEP_TYPES, type WorkflowStep, type WorkflowStepType } from "@/lib/ai-workflows/engine";
 import type { SavedPromptLike } from "@/lib/prompt-library/types";
 import type { AiTemplateLike } from "@/lib/ai-templates/types";
@@ -18,6 +22,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 
 const STEP_TYPE_LABELS: Record<WorkflowStepType, string> = {
   ai_tool: "Ejecutar herramienta IA",
@@ -27,6 +32,9 @@ const STEP_TYPE_LABELS: Record<WorkflowStepType, string> = {
   transform: "Transformar salida",
   save_result: "Guardar resultado",
   workflow: "Ejecutar sub-workflow",
+  agent: "Ejecutar agente de AI Agent Studio",
+  knowledge: "Buscar en Knowledge Base",
+  performance: "Consultar Performance Intelligence",
 };
 
 interface WorkflowOption {
@@ -79,7 +87,15 @@ export function WorkflowStepEditor({
   const [brandProfiles, setBrandProfiles] = useState<BrandProfileLike[]>([]);
   const [workflowOptions, setWorkflowOptions] = useState<WorkflowOption[]>([]);
   const [childRevisions, setChildRevisions] = useState<Record<string, RevisionOption[]>>({});
+  const [knowledgeCollections, setKnowledgeCollections] = useState<{ id: string; name: string }[]>([]);
+  const [knowledgeSources, setKnowledgeSources] = useState<{ id: string; title: string }[]>([]);
+  const [performanceContentItems, setPerformanceContentItems] = useState<{ id: string; title: string }[]>([]);
+  const [performanceCampaigns, setPerformanceCampaigns] = useState<{ id: string; name: string }[]>([]);
+  const [performanceSocialPosts, setPerformanceSocialPosts] = useState<{ id: string; internalTitle: string | null; text: string }[]>([]);
+  const [performanceMetrics, setPerformanceMetrics] = useState<{ key: string; name: string }[]>([]);
+  const [performanceExperiments, setPerformanceExperiments] = useState<{ id: string; name: string }[]>([]);
   const tools = listToolDefinitions();
+  const agents = listAgentDefinitions().filter((a) => a.active);
 
   useEffect(() => {
     let cancelled = false;
@@ -88,12 +104,26 @@ export function WorkflowStepEditor({
       listAiTemplatesForSelectAction(projectId),
       listBrandProfilesForSelectAction(projectId),
       listWorkflowsForSelectAction(projectId, workflowId),
-    ]).then(([promptResult, templateResult, brandResult, workflowResult]) => {
+      listCollectionsForSelectAction(projectId),
+      listSourcesForSelectAction(projectId),
+      listContentItemsForSelectAction(projectId),
+      listCampaignsForSelectAction(projectId),
+      listSocialPostsForSelectAction(projectId),
+      listMetricCatalogAction(),
+      listExperimentsAction(projectId),
+    ]).then(([promptResult, templateResult, brandResult, workflowResult, collectionResult, sourceResult, contentItemResult, campaignResult, socialPostResult, metricResult, experimentResult]) => {
       if (cancelled) return;
       setPrompts(promptResult);
       setTemplates(templateResult);
       setBrandProfiles(brandResult);
       setWorkflowOptions(workflowResult);
+      setKnowledgeCollections(collectionResult);
+      setKnowledgeSources(sourceResult.map((s) => ({ id: s.id, title: s.title })));
+      setPerformanceContentItems(contentItemResult);
+      setPerformanceCampaigns(campaignResult);
+      setPerformanceSocialPosts(socialPostResult);
+      setPerformanceMetrics(metricResult.map((m) => ({ key: m.key, name: m.name })));
+      setPerformanceExperiments(experimentResult.map((e) => ({ id: e.id, name: e.name })));
     });
     return () => {
       cancelled = true;
@@ -115,6 +145,11 @@ export function WorkflowStepEditor({
   function updateFieldInput(index: number, fieldName: string, value: string) {
     const step = steps[index];
     onChange(steps.map((s, i) => (i === index ? { ...s, fieldInputs: { ...step.fieldInputs, [fieldName]: value } } : s)));
+  }
+
+  function updateAgentFieldInput(index: number, fieldKey: string, value: string) {
+    const step = steps[index];
+    onChange(steps.map((s, i) => (i === index ? { ...s, agentFieldInputs: { ...step.agentFieldInputs, [fieldKey]: value } } : s)));
   }
 
   function updateChildInputMapping(index: number, childVarName: string, value: string) {
@@ -248,6 +283,251 @@ export function WorkflowStepEditor({
                         </div>
                       );
                     })()}
+                  </div>
+                ) : null}
+
+                {step.type === "agent" ? (
+                  <div className="space-y-3">
+                    <div className="space-y-1.5">
+                      <Label htmlFor={`${step.id}-agent`}>Agente de AI Agent Studio</Label>
+                      <Select value={step.agentRef ?? ""} onValueChange={(value) => value && updateStep(index, { agentRef: value })}>
+                        <SelectTrigger id={`${step.id}-agent`} size="sm" className="w-full">
+                          <SelectValue placeholder="Selecciona un agente" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {agents.map((agent) => (
+                            <SelectItem key={agent.key} value={agent.key}>
+                              {agent.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-muted-foreground">Solo agentes oficiales — un agente personalizado necesita seleccionarse desde AI Agent Studio.</p>
+                    </div>
+
+                    {(() => {
+                      const agent = step.agentRef ? findAgentDefinition(step.agentRef) : undefined;
+                      if (!agent) return null;
+                      const fields = [...agent.requiredInputs, ...agent.optionalInputs];
+                      return (
+                        <div className="grid gap-3 rounded-lg border border-dashed p-3 sm:grid-cols-2">
+                          <p className="text-xs text-muted-foreground sm:col-span-2">
+                            Campos de &quot;{agent.name}&quot; — usa <code className="rounded bg-muted px-1">{"{{variable}}"}</code> o{" "}
+                            <code className="rounded bg-muted px-1">{"{{salida_de_paso_anterior}}"}</code> en cualquiera.
+                          </p>
+                          {fields.map((field) => (
+                            <div key={field.key} className="space-y-1.5">
+                              <Label htmlFor={`${step.id}-agent-field-${field.key}`}>
+                                {field.label}
+                                {field.required ? " *" : " (opcional)"}
+                              </Label>
+                              <Input
+                                id={`${step.id}-agent-field-${field.key}`}
+                                value={step.agentFieldInputs?.[field.key] ?? ""}
+                                onChange={(event) => updateAgentFieldInput(index, field.key, event.target.value)}
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    })()}
+                  </div>
+                ) : null}
+
+                {step.type === "knowledge" ? (
+                  <div className="space-y-3">
+                    <div className="space-y-1.5">
+                      <Label htmlFor={`${step.id}-knowledge-query`}>Consulta de búsqueda</Label>
+                      <Input
+                        id={`${step.id}-knowledge-query`}
+                        value={step.knowledgeQuery ?? ""}
+                        onChange={(event) => updateStep(index, { knowledgeQuery: event.target.value })}
+                        placeholder="Ej: políticas de devolución"
+                      />
+                      <p className="text-xs text-muted-foreground">Texto fijo (no admite {"{{variables}}"}) — la búsqueda es real, contra el índice de texto completo de Knowledge Base.</p>
+                    </div>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div className="space-y-1.5">
+                        <Label>Colecciones</Label>
+                        <div className="flex max-h-32 flex-wrap gap-2 overflow-y-auto rounded-lg border border-dashed p-2">
+                          {knowledgeCollections.length === 0 ? <p className="text-xs text-muted-foreground">Sin colecciones en este proyecto.</p> : null}
+                          {knowledgeCollections.map((col) => {
+                            const checked = (step.knowledgeCollectionIds ?? []).includes(col.id);
+                            return (
+                              <label key={col.id} className="flex items-center gap-1.5 text-xs">
+                                <Checkbox
+                                  checked={checked}
+                                  onCheckedChange={() => {
+                                    const current = step.knowledgeCollectionIds ?? [];
+                                    updateStep(index, { knowledgeCollectionIds: checked ? current.filter((id) => id !== col.id) : [...current, col.id] });
+                                  }}
+                                />
+                                {col.name}
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label>Fuentes</Label>
+                        <div className="flex max-h-32 flex-wrap gap-2 overflow-y-auto rounded-lg border border-dashed p-2">
+                          {knowledgeSources.length === 0 ? <p className="text-xs text-muted-foreground">Sin fuentes en este proyecto.</p> : null}
+                          {knowledgeSources.map((src) => {
+                            const checked = (step.knowledgeSourceIds ?? []).includes(src.id);
+                            return (
+                              <label key={src.id} className="flex items-center gap-1.5 text-xs">
+                                <Checkbox
+                                  checked={checked}
+                                  onCheckedChange={() => {
+                                    const current = step.knowledgeSourceIds ?? [];
+                                    updateStep(index, { knowledgeSourceIds: checked ? current.filter((id) => id !== src.id) : [...current, src.id] });
+                                  }}
+                                />
+                                {src.title}
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
+
+                {step.type === "performance" ? (
+                  <div className="space-y-3">
+                    <div className="space-y-1.5">
+                      <Label>Operación</Label>
+                      <Select
+                        value={step.performanceOperation ?? ""}
+                        onValueChange={(value) => updateStep(index, { performanceOperation: value as WorkflowStep["performanceOperation"] })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecciona una operación" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="query">Consultar métricas internas del periodo</SelectItem>
+                          <SelectItem value="compare">Comparar recursos</SelectItem>
+                          <SelectItem value="recommend">Leer recomendaciones pendientes</SelectItem>
+                          <SelectItem value="experiment_result">Leer resultado de un experimento</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-muted-foreground">Solo lectura — este nodo nunca registra ni modifica métricas (spec section 36).</p>
+                    </div>
+
+                    {step.performanceOperation === "query" || step.performanceOperation === "compare" ? (
+                      <>
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          <div className="space-y-1.5">
+                            <Label>Tipo de recurso</Label>
+                            <Select
+                              value={step.performanceResourceType ?? "PROJECT"}
+                              onValueChange={(value) => updateStep(index, { performanceResourceType: value as WorkflowStep["performanceResourceType"], performanceResourceId: undefined, performanceCompareResourceIds: undefined })}
+                            >
+                              <SelectTrigger>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="PROJECT">Todo el proyecto</SelectItem>
+                                <SelectItem value="CONTENT_ITEM">Contenido</SelectItem>
+                                <SelectItem value="CAMPAIGN">Campaña</SelectItem>
+                                <SelectItem value="SOCIAL_POST">Publicación</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label>Días hacia atrás</Label>
+                            <Input
+                              type="number"
+                              min={1}
+                              max={730}
+                              value={step.performancePeriodDays ?? 30}
+                              onChange={(event) => updateStep(index, { performancePeriodDays: Number(event.target.value) })}
+                            />
+                          </div>
+                        </div>
+
+                        {step.performanceResourceType && step.performanceResourceType !== "PROJECT" ? (
+                          <div className="space-y-1.5">
+                            <Label>{step.performanceOperation === "compare" ? "Recurso principal" : "Recurso"}</Label>
+                            <Select value={step.performanceResourceId ?? ""} onValueChange={(value) => value && updateStep(index, { performanceResourceId: value })}>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Selecciona un recurso" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {step.performanceResourceType === "CONTENT_ITEM" && performanceContentItems.map((r) => <SelectItem key={r.id} value={r.id}>{r.title}</SelectItem>)}
+                                {step.performanceResourceType === "CAMPAIGN" && performanceCampaigns.map((r) => <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}
+                                {step.performanceResourceType === "SOCIAL_POST" && performanceSocialPosts.map((r) => <SelectItem key={r.id} value={r.id}>{r.internalTitle || r.text.slice(0, 40)}</SelectItem>)}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        ) : null}
+
+                        {step.performanceOperation === "compare" && step.performanceResourceType && step.performanceResourceType !== "PROJECT" ? (
+                          <div className="space-y-1.5">
+                            <Label>Comparar contra</Label>
+                            <div className="flex max-h-32 flex-wrap gap-2 overflow-y-auto rounded-lg border border-dashed p-2">
+                              {(step.performanceResourceType === "CONTENT_ITEM" ? performanceContentItems : step.performanceResourceType === "CAMPAIGN" ? performanceCampaigns : performanceSocialPosts)
+                                .filter((r) => r.id !== step.performanceResourceId)
+                                .map((r) => {
+                                  const label = "title" in r ? r.title : "name" in r ? r.name : r.internalTitle || r.text.slice(0, 40);
+                                  const checked = (step.performanceCompareResourceIds ?? []).includes(r.id);
+                                  return (
+                                    <label key={r.id} className="flex items-center gap-1.5 text-xs">
+                                      <Checkbox
+                                        checked={checked}
+                                        onCheckedChange={() => {
+                                          const current = step.performanceCompareResourceIds ?? [];
+                                          updateStep(index, { performanceCompareResourceIds: checked ? current.filter((id) => id !== r.id) : [...current, r.id] });
+                                        }}
+                                      />
+                                      {label}
+                                    </label>
+                                  );
+                                })}
+                            </div>
+                          </div>
+                        ) : null}
+
+                        <div className="space-y-1.5">
+                          <Label>Métricas</Label>
+                          <div className="flex max-h-32 flex-wrap gap-2 overflow-y-auto rounded-lg border border-dashed p-2">
+                            {performanceMetrics.map((m) => {
+                              const checked = (step.performanceMetricKeys ?? []).includes(m.key);
+                              return (
+                                <label key={m.key} className="flex items-center gap-1.5 text-xs">
+                                  <Checkbox
+                                    checked={checked}
+                                    onCheckedChange={() => {
+                                      const current = step.performanceMetricKeys ?? [];
+                                      updateStep(index, { performanceMetricKeys: checked ? current.filter((k) => k !== m.key) : [...current, m.key] });
+                                    }}
+                                  />
+                                  {m.name}
+                                </label>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </>
+                    ) : null}
+
+                    {step.performanceOperation === "experiment_result" ? (
+                      <div className="space-y-1.5">
+                        <Label>Experimento</Label>
+                        <Select value={step.performanceExperimentId ?? ""} onValueChange={(value) => value && updateStep(index, { performanceExperimentId: value })}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecciona un experimento" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {performanceExperiments.map((e) => (
+                              <SelectItem key={e.id} value={e.id}>
+                                {e.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    ) : null}
                   </div>
                 ) : null}
 

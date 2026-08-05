@@ -13,6 +13,9 @@ export const metadata: Metadata = { title: "Notificaciones" };
 export default async function NotificationsPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
+  // Outside proxy.ts's /dashboard/:path* matcher (this route group doesn't
+  // appear in the URL), so it needs its own check — same as /account.
+  if (!user.emailVerified) redirect("/verify-email");
 
   const notifications = await prisma.notification.findMany({
     where: { userId: user.id },

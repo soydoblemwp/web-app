@@ -2,6 +2,8 @@ import { renderTemplate } from "@/lib/ai-templates/engine";
 import { findToolDefinition } from "@/lib/ai-center/tools/registry";
 import type { AiToolFieldValues } from "@/lib/ai-center/tools/types";
 import { applyTransform, type WorkflowStep } from "@/lib/ai-workflows/engine";
+import { findAgentDefinition } from "@/lib/agents/registry";
+import { buildAgentPrompt } from "@/lib/agents/prompt-builder";
 
 /**
  * Resolves ONE workflow step for REAL execution — pure, no database access,
@@ -51,6 +53,10 @@ export interface ExecutionResourceContext {
   childDefinitionHash?: string;
   /** The frozen revision's own name, for display only (Workspace/progress UI labels). */
   childWorkflowName?: string;
+  /** knowledge step: the real search result, already resolved (formatted, citation-labeled text) by buildResourcesForStep — real Postgres full-text search needs DB access, which this pure resolver never has. */
+  knowledgeSearchResult?: string;
+  /** performance step (Fase 34 adapter): the real, already-resolved Performance Intelligence result (formatted text) — computed once by buildResourcesForStep, since this pure resolver never touches the database. */
+  performanceResult?: string;
 }
 
 function missingVariablesError(missing: string[]): StepResolutionResult {
@@ -122,6 +128,50 @@ export function resolveStepForExecution(
       const { output: resolvedInput, missing } = renderTemplate(step.inputTemplate ?? "", resolvedVariables);
       if (missing.length > 0) return missingVariablesError(missing);
       return { kind: "resolved", output: resolvedInput, resolvedInputSummary: resolvedInput };
+    }
+
+    // Fase 31 adapter: only OFFICIAL (code-defined) AI Agent Studio agents
+    // can back a workflow node — same boundary "ai_tool" draws around the
+    // static AI Center registry (a custom agent would need DB-backed
+    // ownership resolution, which belongs in buildResourcesForStep, not
+    // this pure resolver). Reuses the agent's own registered input fields
+    // and the shared structured-output prompt builder — never a second
+    // prompt-building path.
+    case "agent": {
+      const agent = findAgentDefinition(step.agentRef ?? "");
+      if (!agent) return { kind: "error", message: `El agente "${step.agentRef}" ya no existe en el registro de AI Agent Studio.` };
+
+      const fields = [...agent.requiredInputs, ...agent.optionalInputs];
+      const values: Record<string, unknown> = {};
+      const missingFields: string[] = [];
+      for (const field of fields) {
+        const template = step.agentFieldInputs?.[field.key] ?? "";
+        const { output, missing } = renderTemplate(template, resolvedVariables);
+        if (field.required && (!output.trim() || missing.length > 0)) missingFields.push(field.label);
+        values[field.key] = output;
+      }
+      if (missingFields.length > 0) {
+        return { kind: "error", message: `Faltan valores para los campos: ${missingFields.join(", ")}.` };
+      }
+
+      const { systemPrompt, userPrompt } = buildAgentPrompt({
+        agentDefinition: agent,
+        inputValues: values,
+        context: [],
+        brandContext: resources.brandContext,
+        memoryInstructions: [],
+      });
+      return { kind: "ai_call", systemPrompt, userPrompt, resolvedInputSummary: JSON.stringify(values) };
+    }
+
+    case "knowledge": {
+      if (resources.knowledgeSearchResult === undefined) return { kind: "error", message: "El resultado de búsqueda de Knowledge Base de este paso ya no está disponible." };
+      return { kind: "resolved", output: resources.knowledgeSearchResult, resolvedInputSummary: step.knowledgeQuery ?? "" };
+    }
+
+    case "performance": {
+      if (resources.performanceResult === undefined) return { kind: "error", message: "El resultado de Performance Intelligence de este paso ya no está disponible." };
+      return { kind: "resolved", output: resources.performanceResult, resolvedInputSummary: step.performanceOperation ?? "" };
     }
 
     case "workflow": {
