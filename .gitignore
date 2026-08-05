@@ -45,3 +45,10 @@ next-env.d.ts
 
 .vercel
 .env*
+
+# Playwright (Fase 45 browser validation) — reports/results are run artifacts,
+# never committed; browser binaries live outside the repo in the OS cache.
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/

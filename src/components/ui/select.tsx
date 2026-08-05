@@ -187,7 +187,75 @@ function SelectScrollDownButton({
   )
 }
 
+export interface LabeledSelectOption {
+  value: string
+  label: React.ReactNode
+  disabled?: boolean
+}
+
+export interface LabeledSelectProps {
+  value: string
+  onValueChange: (value: string) => void
+  options: readonly LabeledSelectOption[]
+  placeholder?: string
+  id?: string
+  className?: string
+  disabled?: boolean
+  size?: "sm" | "default"
+  "aria-label"?: string
+  "aria-labelledby"?: string
+}
+
+/**
+ * Root cause of the "shows the raw value instead of the label before first
+ * interaction" bug (found in Fase 47/48): `<SelectValue>` normally resolves
+ * its label by looking up the item registered by each `<SelectItem>` — but
+ * those only register once the popup's content actually mounts in the DOM,
+ * which Base UI defers until the select is first opened. Before that, there
+ * is nothing to look up, so it falls back to the raw value.
+ *
+ * Base UI's own documented fix is `<Select.Root items={...}>`: when the
+ * root is given the value→label mapping directly, `<Select.Value>` resolves
+ * it synchronously from that prop — no dependency on DOM mount order, and
+ * safe across SSR/hydration. `LabeledSelect` is a thin wrapper that always
+ * supplies `items`, so every consumer gets a correct label from the very
+ * first render without writing its own `<SelectValue>{labelMap[value]}</SelectValue>`
+ * workaround. There is no way to retrofit this onto every existing bare
+ * `<Select>` call site automatically (Base UI has no supported "always keep
+ * the popup content mounted" flag, and the value→label data only exists at
+ * each call site) — new code and any consumer that needs a reliably correct
+ * label should use `LabeledSelect` instead of composing `Select` by hand.
+ */
+function LabeledSelect({
+  value,
+  onValueChange,
+  options,
+  placeholder,
+  id,
+  className,
+  disabled,
+  size,
+  ...aria
+}: LabeledSelectProps) {
+  const items = React.useMemo(() => Object.fromEntries(options.map((o) => [o.value, o.label])), [options])
+  return (
+    <Select items={items} value={value} onValueChange={(v) => onValueChange(v as string)} disabled={disabled}>
+      <SelectTrigger id={id} className={className} size={size} {...aria}>
+        <SelectValue placeholder={placeholder} />
+      </SelectTrigger>
+      <SelectContent>
+        {options.map((o) => (
+          <SelectItem key={o.value} value={o.value} disabled={o.disabled}>
+            {o.label}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  )
+}
+
 export {
+  LabeledSelect,
   Select,
   SelectContent,
   SelectGroup,
