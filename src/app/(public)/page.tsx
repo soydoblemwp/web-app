@@ -15,6 +15,8 @@ import {
 import { appConfig } from "@/lib/config";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { getFeaturedPublicTools } from "@/lib/public-tools/registry";
+import { PublicToolCard } from "@/components/public-tools/public-tool-card";
 
 const modules = [
   { icon: Bot, title: "Asistente IA", description: "Chat contextual que conoce tu proyecto, tu marca y tu historial." },
@@ -56,15 +58,18 @@ export default async function LandingPage() {
   const user = await getCurrentUser();
   if (user) redirect("/dashboard");
 
+  const featuredTools = getFeaturedPublicTools().slice(0, 6);
+
   return (
     <div className="flex flex-1 flex-col">
       <header className="border-b">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
           <span className="text-lg font-semibold tracking-tight">{appConfig.name}</span>
           <nav className="flex flex-wrap items-center justify-end gap-2">
-            <Button variant="ghost" render={<Link href="/guest">Continuar sin cuenta</Link>} />
-            <Button variant="ghost" render={<Link href="/login">Iniciar sesión</Link>} />
-            <Button render={<Link href="/register">Crear cuenta</Link>} />
+            <Button variant="ghost" nativeButton={false} render={<Link href="/herramientas">Herramientas</Link>} />
+            <Button variant="ghost" nativeButton={false} render={<Link href="/guest">Continuar sin cuenta</Link>} />
+            <Button variant="ghost" nativeButton={false} render={<Link href="/login">Iniciar sesión</Link>} />
+            <Button nativeButton={false} render={<Link href="/register">Crear cuenta</Link>} />
           </nav>
         </div>
       </header>
@@ -79,9 +84,9 @@ export default async function LandingPage() {
             historial.
           </p>
           <div className="mt-8 flex flex-wrap justify-center gap-3">
-            <Button size="lg" render={<Link href="/register">Empezar gratis</Link>} />
-            <Button size="lg" variant="outline" render={<Link href="/login">Ya tengo cuenta</Link>} />
-            <Button size="lg" variant="outline" render={<Link href="/guest">Continuar sin cuenta</Link>} />
+            <Button size="lg" nativeButton={false} render={<Link href="/register">Empezar gratis</Link>} />
+            <Button size="lg" variant="outline" nativeButton={false} render={<Link href="/login">Ya tengo cuenta</Link>} />
+            <Button size="lg" variant="outline" nativeButton={false} render={<Link href="/guest">Continuar sin cuenta</Link>} />
           </div>
           <p className="mt-3 text-xs text-muted-foreground">
             Sin registro puedes probar las herramientas básicas al momento. Tu contenido se conserva solo durante
@@ -100,6 +105,21 @@ export default async function LandingPage() {
                 </CardHeader>
                 <CardContent className="text-sm text-muted-foreground">{m.description}</CardContent>
               </Card>
+            ))}
+          </div>
+        </section>
+
+        <section className="mx-auto max-w-6xl px-6 py-12">
+          <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <h2 className="text-2xl font-semibold tracking-tight">Herramientas gratuitas</h2>
+              <p className="mt-1 text-sm text-muted-foreground">Sin registro, procesadas en tu navegador o con IA local. Prueba cualquiera al instante.</p>
+            </div>
+            <Button variant="outline" nativeButton={false} render={<Link href="/herramientas">Ver todas las herramientas</Link>} />
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {featuredTools.map((tool) => (
+              <PublicToolCard key={tool.slug} tool={tool} compact />
             ))}
           </div>
         </section>
@@ -162,7 +182,10 @@ export default async function LandingPage() {
           <span>
             © {new Date().getFullYear()} {appConfig.name}
           </span>
-          <nav className="flex gap-4">
+          <nav className="flex flex-wrap gap-4">
+            <Link href="/herramientas" className="hover:underline">
+              Herramientas
+            </Link>
             <Link href="/legal/privacy" className="hover:underline">
               Privacidad
             </Link>
